@@ -84,7 +84,7 @@ class TestParser < Test::Unit::TestCase
 				<input semantic="POSITION" source="#position" offset="0"/>
 				<input semantic="NORMAL"   source="#normal" offset="0"/>
 				<input semantic="TEXCOORD" source="#mapping" offset="0"/>
-				<p>1 2 3</p> 
+				<p>0 1 2</p> 
 			</triangles>
 		</mesh>
 		EOF
@@ -96,6 +96,44 @@ class TestParser < Test::Unit::TestCase
 			[[["PX", 1.0], ["PY", 2.0], ["PZ", 3.0]], [["NX", 4.0], ["NY", 5.0], ["NZ", 6.0]], [["TU", 7.0], ["TV", 8.0]]],
 			[[["PX", 11.0], ["PY", 12.0], ["PZ", 13.0]], [["NX", 14.0], ["NY", 15.0], ["NZ", 16.0]], [["TU", 17.0], ["TV", 18.0]]],
 			[[["PX", 21.0], ["PY", 22.0], ["PZ", 23.0]], [["NX", 24.0], ["NY", 25.0], ["NZ", 26.0]], [["TU", 27.0], ["TV", 28.0]]],
+		]
+		
+		assert_equal expected[0], mesh.polygons[0]
+		assert_equal expected[1], mesh.polygons[1]
+		assert_equal expected[2], mesh.polygons[2]
+	end
+	
+	def test_sources_skipping
+		chunk = <<-EOF
+		<?xml version="1.0" encoding="utf-8"?>
+		<mesh>
+			<source id="test1">
+				<float_array name="values" count="9">
+				1.0 2.0 3.0 4.0 5.0 6.0 7.0 8.0 9.0
+				</float_array>
+				<technique_common>
+					<accessor source="#values" count="3" stride="3">
+						<param name="PX" type="float"/>
+						<param type="float"/>
+						<param name="PZ" type="float"/>
+					</accessor>
+				</technique_common>
+			</source> 
+
+			<triangles count="1">
+				<input semantic="POSITION" source="#test1" offset="0"/>
+				<p>0 1 2</p> 
+			</triangles>
+		</mesh>
+		EOF
+		
+		doc = REXML::Document.new(chunk)
+		mesh = Collada::Parser::Geometry::Mesh.parse(doc, doc.elements['mesh'])
+		
+		expected = [
+			[[["PX", 1.0], ["PZ", 3.0]]],
+			[[["PX", 4.0], ["PZ", 6.0]]],
+			[[["PX", 7.0], ["PZ", 9.0]]],
 		]
 		
 		assert_equal expected[0], mesh.polygons[0]

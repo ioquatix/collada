@@ -229,7 +229,7 @@ module Collada
 					end
 					
 					def self.parse_indices(doc, element)
-						element.elements['p'].text.strip.split(/\s+/).collect{|index| index.to_i - 1}
+						element.elements['p'].text.strip.split(/\s+/).collect &:to_i
 					end
 					
 					def self.parse(doc, element, sources = {})
