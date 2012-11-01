@@ -2,6 +2,8 @@
 
 This library provides support for loading and processing data from Collada Digital Asset Exchange files. These files are typically used for sharing geometry and scenes.
 
+[![Build Status](https://secure.travis-ci.org/ioquatix/collada.png)](http://travis-ci.org/ioquatix/collada)
+
 ## Installation
 
 Add this line to your application's Gemfile:
