@@ -24,9 +24,51 @@ module Collada
 	module Parser
 		class Geometry
 			class Mesh
+				class Attribute
+					def initialize(semantic, value)
+						@semantic = semantic
+						@value = value
+					end
+			
+					attr :semantic
+					attr :value
+			
+					def [] key
+						@value[key]
+					end
+					
+					def == other
+						@value == other.value
+					end
+					
+					def inspect
+						"#{@value.inspect}#{@semantic.inspect}"
+					end
+					
+					def self.method_missing(method, *args)
+						if args.size == 1 && Hash === args[0]
+							new(method, args[0])
+						else
+							new(method, args)
+						end
+					end
+					
+					def flatten
+						if Array === @value
+							@value.collect{|attribute| attribute.flatten}
+						else
+							self
+						end
+					end
+					
+					def self.flatten(attributes)
+						attributes.collect{|attribute| attribute.flatten}.flatten
+					end
+				end
+				
 				class Parameter
 					def initialize(name, type)
-						@name = name
+						@name = name ? name.to_sym : nil
 						@type = type
 					end
 					
@@ -34,7 +76,7 @@ module Collada
 					attr :type
 					
 					def self.parse(doc, element)
-						self.new(element.attributes['name'], element.attributes['type'].to_sym)
+						self.new(element.attributes['name'], element.attributes['type'])
 					end
 				end
 				
@@ -93,6 +135,8 @@ module Collada
 							array = Mesh.parse_arrays(doc, element).first
 						end
 						
+						raise UnsupportedFeature.new("Source array binding must be valid") unless array
+						
 						parameters = parse_parameters(doc, element)
 						
 						options = {
@@ -104,6 +148,7 @@ module Collada
 					end
 				end
 				
+				# A source that reads directly from a data array:
 				class Source
 					def initialize(id, accessor)
 						@id = id
@@ -118,9 +163,46 @@ module Collada
 						
 						self.new(element.attributes['id'], accessor)
 					end
+					
+					def [] index
+						Hash[@accessor[index]]
+					end
+				end
+				
+				# A source that provides individual vertices:
+				class Vertices
+					include Enumerable
+					
+					def initialize(id, inputs)
+						@id = id
+						@inputs = inputs
+					end
+					
+					attr :id
+					attr :inputs
+					
+					# Vertices by index, same interface as Input.
+					def [] index
+						@inputs.collect do |input|
+							input[index]
+						end
+					end
+					
+					def self.parse_inputs(doc, element, sources = {})
+						OrderedMap.parse(element, 'input') do |input_element|
+							Input.parse(doc, input_element, sources)
+						end
+					end
+					
+					def self.parse(doc, element, sources = {})
+						inputs = parse_inputs(doc, element, sources)
+						
+						self.new(element.attributes['id'], inputs)
+					end
 				end
 				
 				class Input
+					# `Vertices` or `Source` are both okay for source.
 					def initialize(semantic, source, offset = 0)
 						@semantic = semantic
 						@source = source
@@ -131,6 +213,10 @@ module Collada
 					attr :source
 					attr :offset
 					
+					def [] index
+						Attribute.new(@semantic, @source[index + @offset])
+					end
+					
 					def self.parse(doc, element, sources = {})
 						semantic = element.attributes['semantic']
 
@@ -139,29 +225,33 @@ module Collada
 							source = sources[source_id]
 						end
 
+						raise UnsupportedFeature.new("Can't instantiate input with nil source (#{source_id})!") unless source
+
 						offset = element.attributes['offset'] || 0
 
-						self.new(semantic, source, offset.to_i)
+						self.new(semantic.downcase.to_sym, source, offset.to_i)
 					end
 				end
 				
-				class TriangleVertices
-					def count(index)
+				# Vertices are organised as triangles
+				class Triangles
+					def vertex_count index
 						3
 					end
 				end
 				
-				class PolygonVertices
+				# Vertices are organised as arbitrary ngons.
+				class PolyList
 					def initialize(counts)
 						@counts = counts
 					end
 					
-					def count(index)
+					def vertex_count index
 						@counts[index]
 					end
 					
 					def self.parse(doc, element)
-						counts = element.elements('vcount').text.strip.split(/\s+/).collect &:to_i
+						counts = element.elements['vcount'].text.strip.split(/\s+/).collect &:to_i
 						
 						self.new(counts)
 					end
@@ -170,7 +260,7 @@ module Collada
 				class Polygons
 					include Enumerable
 					
-					def initialize(inputs, indices, count, vertices)
+					def initialize(inputs, indices, count, elements)
 						@inputs = inputs
 						@indices = indices
 						
@@ -178,7 +268,7 @@ module Collada
 						@count = count
 						
 						# The number of vertices per polygon:
-						@vertices = vertices
+						@elements = elements
 						
 						# The number of indices per vertex:
 						@stride = @inputs.sort_by(&:offset).last.offset + 1
@@ -190,8 +280,8 @@ module Collada
 					# Element count:
 					attr :count
 					
-					# Number of vertices per element:
-					attr :vertices
+					# Per-element data:
+					attr :elements
 					
 					# Number of indices consumed per vertex:
 					attr :stride
@@ -201,29 +291,37 @@ module Collada
 					end
 					
 					# Vertices by index:
-					def [] index
+					def vertex index
 						offset = @stride * index
 						
-						@inputs.collect do |input|
-							input.source.accessor[@indices[offset + input.offset]]
+						attributes = @inputs.collect do |input|
+							input[@indices[offset]]
 						end
+						
+						return Attribute.flatten(attributes)
 					end
 					
+					# Iterate over each polygon/triangle:
 					def each
-						consumed = 0
+						vertex_offset = 0
 						
 						@count.times do |index|
-							elements = @vertices.count(index)
-							polygon = elements.times.collect{|edge| self[consumed + edge]}
+							# There are n vertices per face:
+							vertex_count = @elements.vertex_count(index)
+							
+							# Grap all the vertices
+							polygon = vertex_count.times.collect do |vertex_index|
+								vertex(vertex_offset + vertex_index)
+							end
 							
 							yield polygon
 							
-							consumed += elements
+							vertex_offset += vertex_count
 						end
 					end
 					
 					def self.parse_inputs(doc, element, sources = {})
-						OrderedMap.parse(element, '//input') do |input_element|
+						OrderedMap.parse(element, 'input') do |input_element|
 							Input.parse(doc, input_element, sources)
 						end
 					end
@@ -238,9 +336,9 @@ module Collada
 						count = element.attributes['count'].to_i
 						
 						if element.name == 'triangles'
-							self.new(inputs, indices, count, TriangleVertices.new)
+							self.new(inputs, indices, count, Triangles.new)
 						elsif element.name == 'polylist'
-							self.new(inputs, indices, count, PolygonVertices.parse(doc, element))
+							self.new(inputs, indices, count, PolyList.parse(doc, element))
 						else
 							raise UnsupportedFeature.new(element)
 						end
@@ -256,7 +354,7 @@ module Collada
 				attr :polygons
 				
 				def self.parse_arrays(doc, element)
-					OrderedMap.parse(element, '//float_array | //int_array', 'name') do |array_element|
+					OrderedMap.parse(element, '//float_array | //int_array', 'id') do |array_element|
 						array_element.text.strip.split(/\s+/).collect &:to_f
 					end
 				end
@@ -266,6 +364,11 @@ module Collada
 					
 					sources = OrderedMap.parse(element, 'source') do |source_element|
 						Source.parse(doc, source_element, arrays)
+					end
+					
+					if (vertices_element = element.elements['vertices'])
+						vertices = Vertices.parse(doc, vertices_element, sources)
+						sources.append(vertices.id, vertices)
 					end
 					
 					if (polygons_element = element.elements['triangles | polylist'])

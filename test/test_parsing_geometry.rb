@@ -26,12 +26,14 @@ require 'stringio'
 
 require 'collada/parser'
 
-class TestParser < Test::Unit::TestCase
+class TestParsingGeometry < Test::Unit::TestCase
+	Attribute = Collada::Parser::Geometry::Mesh::Attribute
+	
 	def test_accessors
 		parameters = [
-			Collada::Parser::Geometry::Mesh::Parameter.new('X', :float),
+			Collada::Parser::Geometry::Mesh::Parameter.new(:x, :float),
 			Collada::Parser::Geometry::Mesh::Parameter.new(nil, :float),
-			Collada::Parser::Geometry::Mesh::Parameter.new('Z', :float),
+			Collada::Parser::Geometry::Mesh::Parameter.new(:z, :float),
 		]
 		
 		accessor = Collada::Parser::Geometry::Mesh::Accessor.new(
@@ -39,11 +41,11 @@ class TestParser < Test::Unit::TestCase
 			parameters
 		)
 		
-		assert_equal [['X', 1], ['Z', 3]], accessor[0]
-		assert_equal [['X', 4], ['Z', 6]], accessor[1]
+		assert_equal [[:x, 1], [:z, 3]], accessor[0]
+		assert_equal [[:x, 4], [:z, 6]], accessor[1]
 		
 		assert_equal 2, accessor.size
-		assert_equal [[["X", 1], ["Z", 3]], [["X", 4], ["Z", 6]]], accessor.to_a
+		assert_equal [[[:x, 1], [:z, 3]], [[:x, 4], [:z, 6]]], accessor.to_a
 	end
 	
 	def test_sources
@@ -51,31 +53,31 @@ class TestParser < Test::Unit::TestCase
 		<?xml version="1.0" encoding="utf-8"?>
 		<mesh>
 			<source id="position">
-				<float_array name="values" count="30">
+				<float_array id="values" count="30">
 					1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30
 				</float_array>
 				<technique_common>
 					<accessor source="#values" count="3" stride="10">
-						<param name="PX" type="float"/>
-						<param name="PY" type="float"/>
-						<param name="PZ" type="float"/>
+						<param name="px" type="float"/>
+						<param name="py" type="float"/>
+						<param name="pz" type="float"/>
 					</accessor>
 				</technique_common>
 			</source>
 			<source id="normal">
 				<technique_common>
 					<accessor source="#values" offset="3" count="3" stride="10">
-						<param name="NX" type="float"/>
-						<param name="NY" type="float"/>
-						<param name="NZ" type="float"/>
+						<param name="nx" type="float"/>
+						<param name="ny" type="float"/>
+						<param name="nz" type="float"/>
 					</accessor>
 				</technique_common>
 			</source>
 			<source id="mapping">
 				<technique_common>
 					<accessor source="#values" offset="6" count="3" stride="10">
-						<param name="TU" type="float"/>
-						<param name="TV" type="float"/>
+						<param name="mu" type="float"/>
+						<param name="mv" type="float"/>
 					</accessor>
 				</technique_common>
 			</source>
@@ -93,14 +95,26 @@ class TestParser < Test::Unit::TestCase
 		mesh = Collada::Parser::Geometry::Mesh.parse(doc, doc.elements['mesh'])
 		
 		expected = [
-			[[["PX", 1.0], ["PY", 2.0], ["PZ", 3.0]], [["NX", 4.0], ["NY", 5.0], ["NZ", 6.0]], [["TU", 7.0], ["TV", 8.0]]],
-			[[["PX", 11.0], ["PY", 12.0], ["PZ", 13.0]], [["NX", 14.0], ["NY", 15.0], ["NZ", 16.0]], [["TU", 17.0], ["TV", 18.0]]],
-			[[["PX", 21.0], ["PY", 22.0], ["PZ", 23.0]], [["NX", 24.0], ["NY", 25.0], ["NZ", 26.0]], [["TU", 27.0], ["TV", 28.0]]],
+			[
+				Attribute.position(:px => 1.0, :py => 2.0, :pz => 3.0),
+				Attribute.normal(:nx => 4.0, :ny => 5.0, :nz => 6.0),
+				Attribute.texcoord(:mu => 7.0, :mv => 8.0)
+			],
+			[
+				Attribute.position(:px => 11.0, :py => 12.0, :pz => 13.0),
+				Attribute.normal(:nx => 14.0, :ny => 15.0, :nz => 16.0),
+				Attribute.texcoord(:mu => 17.0, :mv => 18.0)
+			],
+			[
+				Attribute.position(:px => 21.0, :py => 22.0, :pz => 23.0),
+				Attribute.normal(:nx => 24.0, :ny => 25.0, :nz => 26.0),
+				Attribute.texcoord(:mu => 27.0, :mv => 28.0)
+			],
 		]
 		
-		assert_equal expected[0], mesh.polygons[0]
-		assert_equal expected[1], mesh.polygons[1]
-		assert_equal expected[2], mesh.polygons[2]
+		assert_equal expected[0], mesh.polygons.vertex(0)
+		assert_equal expected[1], mesh.polygons.vertex(1)
+		assert_equal expected[2], mesh.polygons.vertex(2)
 	end
 	
 	def test_sources_skipping
@@ -108,14 +122,14 @@ class TestParser < Test::Unit::TestCase
 		<?xml version="1.0" encoding="utf-8"?>
 		<mesh>
 			<source id="test1">
-				<float_array name="values" count="9">
+				<float_array id="values" count="9">
 				1.0 2.0 3.0 4.0 5.0 6.0 7.0 8.0 9.0
 				</float_array>
 				<technique_common>
 					<accessor source="#values" count="3" stride="3">
-						<param name="PX" type="float"/>
+						<param name='px' type="float"/>
 						<param type="float"/>
-						<param name="PZ" type="float"/>
+						<param name='pz' type="float"/>
 					</accessor>
 				</technique_common>
 			</source> 
@@ -131,13 +145,32 @@ class TestParser < Test::Unit::TestCase
 		mesh = Collada::Parser::Geometry::Mesh.parse(doc, doc.elements['mesh'])
 		
 		expected = [
-			[[["PX", 1.0], ["PZ", 3.0]]],
-			[[["PX", 4.0], ["PZ", 6.0]]],
-			[[["PX", 7.0], ["PZ", 9.0]]],
+			[Attribute.position(:px => 1.0, :pz => 3.0)],
+			[Attribute.position(:px => 4.0, :pz => 6.0)],
+			[Attribute.position(:px => 7.0, :pz => 9.0)],
 		]
 		
-		assert_equal expected[0], mesh.polygons[0]
-		assert_equal expected[1], mesh.polygons[1]
-		assert_equal expected[2], mesh.polygons[2]
+		assert_equal expected[0], mesh.polygons.vertex(0)
+		assert_equal expected[1], mesh.polygons.vertex(1)
+		assert_equal expected[2], mesh.polygons.vertex(2)
+	end
+	
+	def test_library_geometry
+		path = File.expand_path("../sample.dae", __FILE__)
+		
+		doc = REXML::Document.new(File.open(path))
+		library = Collada::Parser::Library.parse(doc)
+		
+		mesh = library[:geometries].first.mesh
+		
+		expected = [
+			[
+				Attribute.position(:X=>1.0, :Y=>1.0, :Z=>-1.0),
+				Attribute.normal(:X=>0.0, :Y=>0.0, :Z=>1.0)
+			]
+		]
+		
+		assert_equal :vertex, mesh.polygons.inputs.ordered[0].semantic
+		assert_equal expected[0], mesh.polygons.vertex(0)
 	end
 end

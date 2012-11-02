@@ -49,6 +49,11 @@ module Collada
 				@ordered.size
 			end
 			
+			def append(key, value)
+				@indexed[key] = value
+				@ordered << value
+			end
+			
 			def self.parse(top, path, id_key = 'id')
 				ordered = []
 				indexed = {}
