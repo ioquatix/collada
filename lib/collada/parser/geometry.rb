@@ -42,7 +42,7 @@ module Collada
 					end
 					
 					def inspect
-						"#{@value.inspect}#{@semantic.inspect}"
+						"Attribute.#{@semantic}(#{@value.inspect})"
 					end
 					
 					def self.method_missing(method, *args)
