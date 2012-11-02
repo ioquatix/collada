@@ -214,7 +214,7 @@ module Collada
 					attr :offset
 					
 					def [] index
-						Attribute.new(@semantic, @source[index + @offset])
+						Attribute.new(@semantic, @source[index])
 					end
 					
 					def self.parse(doc, element, sources = {})
@@ -295,7 +295,7 @@ module Collada
 						offset = @stride * index
 						
 						attributes = @inputs.collect do |input|
-							input[@indices[offset]]
+							input[@indices[offset + input.offset]]
 						end
 						
 						return Attribute.flatten(attributes)
