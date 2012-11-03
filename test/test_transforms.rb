@@ -1,3 +1,5 @@
+#!/usr/bin/env ruby
+
 # Copyright, 2012, by Samuel G. D. Williams. <http://www.codeotaku.com>
 # 
 # Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -18,36 +20,31 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-require 'collada/parser/visual_scene'
-require 'collada/parser/geometry'
+require 'pathname'
+require 'test/unit'
+require 'stringio'
 
-module Collada
-	module Parser
-		class Library
-			SECTIONS = {
-				:visual_scene => ['COLLADA/library_visual_scenes/visual_scene', VisualScene],
-				:geometry => ['COLLADA/library_geometries/geometry', Geometry]
-			}
-			
-			def initialize(sections = {})
-				@sections = sections
-			end
-			
-			def [] key
-				@sections[key]
-			end
-			
-			def self.parse(doc)
-				sections = {}
-				
-				SECTIONS.each do |key, (path, klass)|
-					sections[key] = OrderedMap.parse(doc, path) do |element|
-						klass.parse(doc, element)
-					end
-				end
-				
-				return Library.new(sections)
-			end
-		end
+require 'collada/transforms'
+
+class TestTransforms < Test::Unit::TestCase
+	def test_scale
+		m = Collada::Transforms.scale(2, 4, 6)
+		v = Vector[1, 1, 1, 0]
+
+		assert_equal Vector[2, 4, 6, 0], (m * v)
+	end
+	
+	def test_translate
+		m = Collada::Transforms.translate(2, 4, 6)
+		v = Vector[1, 1, 1, 1]
+
+		assert_equal Vector[3, 5, 7, 1], (m * v)
+	end
+	
+	def test_rotate
+		m = Collada::Transforms.rotate(1, 0, 0, 90)
+		v = Vector[0, 0, 1, 0]
+
+		assert_equal Vector[0, -1.0, 0, 0], (m * v).collect{|i| i.round(2)}
 	end
 end

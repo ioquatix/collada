@@ -22,16 +22,82 @@ require 'collada/parser/support'
 
 module Collada
 	module Parser
-		class VisualScene
-			class Node
-				def initialize(structure = {})
-					@structure = structure
+		class Reference
+			def initialize(kind, id)
+				@kind = kind
+				
+				@id = id
+			end
+			
+			attr :kind
+			attr :id
+			
+			def lookup(library)
+				library[@kind].each do |item|
+					return item if item.id == @id
 				end
 				
-				attr :structure
+				return nil
+			end
+		end
+		
+		class VisualScene
+			class Node
+				def initialize(id, transforms, instance, children, attributes = {})
+					@id = id
+					@transforms = []
+					
+					@instance = instance
+					@children = children
+					
+					@attributes = attributes
+				end
+				
+				attr :id
+				attr :transforms
+				
+				attr :instance
+				attr :children
+				
+				attr :attributes
+				
+				def self.parse_transforms(doc, element)
+					transforms = []
+					
+					element.elements.each('translate | rotate | scale') do |transform_element|
+						values = transform_element.text.strip.split(/\s+/).collect &:to_f
+						transforms << [transform_element.name, values]
+					end
+					
+					return transforms
+				end
+				
+				def self.parse_instance(doc, element)
+					if (instance_geometry_element = element.elements['instance_geometry'])
+						url = instance_geometry_element.attributes['url']
+						
+						Reference.new(:geometry, url.sub(/^#/, ''))
+					end
+				end
+				
+				def self.parse_children(doc, element)
+					children = []
+					
+					element.elements.each('node') do |node_element|
+						children << parse(doc, node_element)
+					end
+					
+					return children
+				end
 				
 				def self.parse(doc, element)
-					self.new(element)
+					id = element.attributes['id']
+					
+					transforms = parse_transforms(doc, element)
+					instance = parse_instance(doc, element)
+					children = parse_children(doc, element)
+					
+					self.new(id, transforms, instance, children, element.attributes)
 				end
 			end
 			

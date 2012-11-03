@@ -379,16 +379,24 @@ module Collada
 				end
 			end
 			
-			def initialize(mesh)
+			def initialize(id, mesh, attributes)
+				@id = id
+				
 				@mesh = mesh
+				
+				@attributes = attributes
 			end
 			
+			attr :id
 			attr :mesh
+			attr :attributes
 			
 			def self.parse(doc, element)
+				id = element.attributes['id']
+				
 				mesh = Mesh.parse(doc, element.elements['mesh'])
 				
-				self.new(mesh)
+				self.new(id, mesh, element.attributes)
 			end
 		end
 	end

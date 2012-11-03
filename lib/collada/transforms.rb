@@ -18,36 +18,51 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-require 'collada/parser/visual_scene'
-require 'collada/parser/geometry'
+require 'matrix'
 
 module Collada
-	module Parser
-		class Library
-			SECTIONS = {
-				:visual_scene => ['COLLADA/library_visual_scenes/visual_scene', VisualScene],
-				:geometry => ['COLLADA/library_geometries/geometry', Geometry]
-			}
+	module Transforms
+		R2D = (180.0 / Math::PI);
+		D2R = (Math::PI / 180.0);
+		
+		def self.scale(x, y, z)
+			Matrix[
+				[x, 0, 0, 0],
+				[0, y, 0, 0],
+				[0, 0, z, 0],
+				[0, 0, 0, 1],
+			]
+		end
+		
+		def self.rotate(x, y, z, angle)
+			c = Math::cos(angle*D2R)
+			s = Math::sin(angle*D2R)
 			
-			def initialize(sections = {})
-				@sections = sections
+			Matrix[
+				[x*x*(1-c) + c, x*y*(1-c) - z*s, x*z*(1-c) + y*s, 0],
+				[x*y*(1-c) + z*s, y*y*(1-c) + c, y*z*(1-c) - x*s, 0],
+				[x*z*(1-c) - y*s, y*z*(1-c) + x*s, z*z*(1-c) + c, 0],
+				[0, 0, 0, 1],
+			]
+		end
+		
+		def self.translate(x, y, z)
+			Matrix[
+				[1, 0, 0, x],
+				[0, 1, 0, y],
+				[0, 0, 1, z],
+				[0, 0, 0, 1],
+			]
+		end
+		
+		def self.for(transforms)
+			product = Matrix.identity(4)
+			
+			transforms.each do |(name, arguments)|
+				product = product * self.send(transform, *arguments)
 			end
 			
-			def [] key
-				@sections[key]
-			end
-			
-			def self.parse(doc)
-				sections = {}
-				
-				SECTIONS.each do |key, (path, klass)|
-					sections[key] = OrderedMap.parse(doc, path) do |element|
-						klass.parse(doc, element)
-					end
-				end
-				
-				return Library.new(sections)
-			end
+			return product
 		end
 	end
 end
