@@ -1,3 +1,5 @@
+#!/usr/bin/env ruby
+
 # Copyright, 2012, by Samuel G. D. Williams. <http://www.codeotaku.com>
 # 
 # Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -18,38 +20,19 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-require 'collada/parser/visual_scene'
-require 'collada/parser/geometry'
-require 'collada/parser/animation'
+require 'pathname'
+require 'test/unit'
+require 'stringio'
 
-module Collada
-	module Parser
-		class Library
-			SECTIONS = {
-				:visual_scene => ['COLLADA/library_visual_scenes/visual_scene', VisualScene],
-				:geometry => ['COLLADA/library_geometries/geometry', Geometry],
-				:animation => ['COLLADA/library_animations/animation', Animation],
-			}
-			
-			def initialize(sections = {})
-				@sections = sections
-			end
-			
-			def [] key
-				@sections[key]
-			end
-			
-			def self.parse(doc)
-				sections = {}
-				
-				SECTIONS.each do |key, (path, klass)|
-					sections[key] = OrderedMap.parse(doc, path) do |element|
-						klass.parse(doc, element)
-					end
-				end
-				
-				return Library.new(sections)
-			end
-		end
+require 'collada/parser'
+
+class TestParsingGeometry < Test::Unit::TestCase
+	def test_library_animation
+		path = File.expand_path("../animation.dae", __FILE__)
+		
+		doc = REXML::Document.new(File.open(path))
+		library = Collada::Parser::Library.parse(doc)
+		
+		assert_equal 10, library[:animation].size
 	end
 end
