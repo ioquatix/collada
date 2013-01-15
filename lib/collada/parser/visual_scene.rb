@@ -19,6 +19,7 @@
 # THE SOFTWARE.
 
 require 'collada/parser/support'
+require 'collada/transforms'
 
 module Collada
 	module Parser
@@ -45,7 +46,7 @@ module Collada
 			class Node
 				def initialize(id, transforms, instance, children, attributes = {})
 					@id = id
-					@transforms = []
+					@transforms = transforms
 					
 					@instance = instance
 					@children = children
@@ -61,12 +62,29 @@ module Collada
 				
 				attr :attributes
 				
+				def transform_matrix
+					Transforms.for(@transforms)
+				end
+				
+				def translation_vector
+					transforms = @transforms.select{|transform| transform[0] == :translate}
+					transforms = transforms.collect{|transform| transform[1]}
+					
+					transforms.inject(Vector[0.0, 0.0, 0.0]){|transform, sum| transform + sum}
+				end
+				
+				def rotation_matrix
+					rotations = @transforms.select{|transform| transform[0] == :rotate}
+					
+					Transforms.for(rotations)
+				end
+				
 				def self.parse_transforms(doc, element)
 					transforms = []
 					
 					element.elements.each('translate | rotate | scale') do |transform_element|
 						values = transform_element.text.strip.split(/\s+/).collect &:to_f
-						transforms << [transform_element.name, values]
+						transforms << [transform_element.name.to_sym, Vector[*values]]
 					end
 					
 					return transforms

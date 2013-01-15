@@ -1,5 +1,3 @@
-#!/usr/bin/env ruby
-
 # Copyright, 2012, by Samuel G. D. Williams. <http://www.codeotaku.com>
 # 
 # Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -46,5 +44,13 @@ class TestTransforms < Test::Unit::TestCase
 		v = Vector[0, 0, 1, 0]
 
 		assert_equal Vector[0, -1.0, 0, 0], (m * v).collect{|i| i.round(2)}
+	end
+	
+	def test_quaternions
+		m = Collada::Transforms.rotate(1, 0, 0, 90)
+		
+		puts m
+		
+		puts Collada::Transforms.rotation_matrix_to_quaternion(m)
 	end
 end
