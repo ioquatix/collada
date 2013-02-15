@@ -23,52 +23,6 @@ require 'collada/parser/support'
 module Collada
 	module Parser
 		class Animation
-			class Sampler
-				def initialize(id, inputs)
-					@id = id
-					@inputs = inputs
-				end
-				
-				attr :id
-				attr :inputs
-				
-				# Vertices by index, same interface as Input.
-				def [] index
-					@inputs.collect do |input|
-						input[index]
-					end
-				end
-				
-				def self.parse_inputs(doc, element, sources = {})
-					OrderedMap.parse(element, 'input') do |input_element|
-						Input.parse(doc, input_element, sources)
-					end
-				end
-				
-				def self.parse(doc, element, sources = {})
-					inputs = parse_inputs(doc, element, sources)
-						
-					self.new(element.attributes['id'], inputs)
-				end
-			end
-			
-			class Channel
-				def initialize(source, target)
-					@source = source
-					@target = target
-				end
-				
-				attr :source
-				attr :target
-				
-				def self.parse(doc, element, sources = {})
-					source_id = element.attributes['source']
-					target_id = element.attributes['target']
-					
-					self.new(sources[source_id], target_id)
-				end
-			end
-			
 			def initialize(id, sources, samples, channels)
 				@id = id
 				@sources = sources
@@ -104,7 +58,7 @@ module Collada
 				end
 				
 				channels = OrderedMap.parse(element, 'channel', 'target') do |channel_element|
-					Channel.parse(doc, channel_element, sources)
+					Channel.parse(doc, channel_element, samplers)
 				end
 				
 				self.new(element.attributes['id'], sources, samplers, channels)

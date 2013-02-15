@@ -27,16 +27,16 @@ require 'stringio'
 require 'collada/parser'
 
 class TestParsingGeometry < Test::Unit::TestCase
-	Attribute = Collada::Parser::Geometry::Mesh::Attribute
+	Attribute = Collada::Parser::Attribute
 	
 	def test_accessors
 		parameters = [
-			Collada::Parser::Geometry::Mesh::Parameter.new(:x, :float),
-			Collada::Parser::Geometry::Mesh::Parameter.new(nil, :float),
-			Collada::Parser::Geometry::Mesh::Parameter.new(:z, :float),
+			Collada::Parser::Parameter.new(:x, :float),
+			Collada::Parser::Parameter.new(nil, :float),
+			Collada::Parser::Parameter.new(:z, :float),
 		]
 		
-		accessor = Collada::Parser::Geometry::Mesh::Accessor.new(
+		accessor = Collada::Parser::Accessor.new(
 			[1, 2, 3, 4, 5, 6],
 			parameters
 		)

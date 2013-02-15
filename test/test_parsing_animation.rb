@@ -33,6 +33,16 @@ class TestParsingGeometry < Test::Unit::TestCase
 		doc = REXML::Document.new(File.open(path))
 		library = Collada::Parser::Library.parse(doc)
 		
-		assert_equal 10, library[:animation].size
+		assert_equal 11, library[:animations].size
+		
+		channels = {}
+		library[:animations].each do |animation|
+			animation.channels.each do |channel|
+				channels[channel.target] = channel
+			end
+		end
+		
+		assert channels['BoneA/transform']
+		assert channels['BoneB/transform']
 	end
 end

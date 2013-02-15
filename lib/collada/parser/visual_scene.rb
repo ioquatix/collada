@@ -99,13 +99,9 @@ module Collada
 				end
 				
 				def self.parse_children(doc, element)
-					children = []
-					
-					element.elements.each('node') do |node_element|
-						children << parse(doc, node_element)
+					OrderedMap.parse(element, 'node', 'id') do |node_element|
+						Node.parse(doc, node_element)
 					end
-					
-					return children
 				end
 				
 				def self.parse(doc, element)
@@ -119,18 +115,14 @@ module Collada
 				end
 			end
 			
-			def initialize(nodes = [])
+			def initialize(nodes)
 				@nodes = nodes
 			end
 			
 			attr :nodes
 			
 			def self.parse(doc, element)
-				nodes = []
-				
-				element.elements.each('node') do |element|
-					nodes << Node.parse(doc, element)
-				end
+				nodes = Node.parse_children(doc, element)
 				
 				self.new(nodes)
 			end

@@ -37,6 +37,14 @@ module Collada
 			attr :ordered
 			attr :indexed
 			
+			def keys
+				@indexed.keys
+			end
+			
+			def values
+				@ordered
+			end
+			
 			def [] key
 				@indexed[key]
 			end
@@ -111,7 +119,7 @@ module Collada
 				attributes.collect{|attribute| attribute.flatten}.flatten
 			end
 		end
-				
+		
 		class Parameter
 			def initialize(name, type)
 				@name = name ? name.to_sym : nil
@@ -121,8 +129,55 @@ module Collada
 			attr :name
 			attr :type
 			
+			def size
+				1
+			end
+			
+			def read value
+				value.first
+			end
+			
 			def self.parse(doc, element)
-				self.new(element.attributes['name'], element.attributes['type'])
+				name = element.attributes['name']
+				type = element.attributes['type']
+				
+				case type
+				when /float(\d)x(\d)/
+					MatrixParameter.new(name, type, [$1.to_i, $2.to_i])
+				when /float(\d)/
+					VectorParameter.new(name, type, [$1.to_i, $2.to_i])
+				else
+					Parameter.new(name, type)
+				end
+			end
+		end
+		
+		class MatrixParameter < Parameter
+			def initialize(name, type, dimensions)
+				super name, type
+				
+				@rows = dimensions[1]
+				@size = dimensions[0] * dimensions[1]
+			end
+			
+			attr :size
+			
+			def read(value)
+				Matrix[*(value.each_slice(@rows).to_a)]
+			end
+		end
+		
+		class VectorParameter < Parameter
+			def initialize(name, type, size)
+				super name, type
+				
+				@size = size
+			end
+			
+			attr :size
+			
+			def read(value)
+				Vector[*value]
 			end
 		end
 		
@@ -132,7 +187,8 @@ module Collada
 			def initialize(array, parameters, options = {})
 				@array = array
 				@parameters = parameters
-				@names = parameters.collect{|parameter| parameter.name}
+				
+				@count = @parameters.inject(0) {|sum, parameter| sum + parameter.size}
 				
 				@offset = (options[:offset] || 0).to_i
 				@stride = (options[:stride] || parameters.size).to_i
@@ -147,9 +203,9 @@ module Collada
 			
 			def read index
 				base = @offset + (index * @stride)
-				values = @array[base, @parameters.size]
+				values = @array[base, @count]
 				
-				@names.zip(values)
+				Hash[@parameters.collect{|parameter| [parameter.name, parameter.read(values.shift(parameter.size))]}]
 			end
 			
 			def [] index
@@ -244,6 +300,52 @@ module Collada
 				offset = element.attributes['offset'] || 0
 				
 				self.new(semantic.downcase.to_sym, source, offset.to_i)
+			end
+		end
+		
+		class Sampler
+			def initialize(id, inputs)
+				@id = id
+				@inputs = inputs
+			end
+				
+			attr :id
+			attr :inputs
+				
+			# Vertices by index, same interface as Input.
+			def [] index
+				@inputs.collect do |input|
+					input[index]
+				end
+			end
+				
+			def self.parse_inputs(doc, element, sources = {})
+				OrderedMap.parse(element, 'input') do |input_element|
+					Input.parse(doc, input_element, sources)
+				end
+			end
+				
+			def self.parse(doc, element, sources = {})
+				inputs = parse_inputs(doc, element, sources)
+						
+				self.new(element.attributes['id'], inputs)
+			end
+		end
+			
+		class Channel
+			def initialize(source, target)
+				@source = source
+				@target = target
+			end
+				
+			attr :source
+			attr :target
+				
+			def self.parse(doc, element, sources = {})
+				source_id = element.attributes['source'].sub(/^\#/, '')
+				target_id = element.attributes['target']
+				
+				self.new(sources[source_id], target_id)
 			end
 		end
 	end

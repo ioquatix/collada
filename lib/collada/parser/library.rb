@@ -21,34 +21,37 @@
 require 'collada/parser/visual_scene'
 require 'collada/parser/geometry'
 require 'collada/parser/animation'
+require 'collada/parser/controller'
 
 module Collada
 	module Parser
 		class Library
 			SECTIONS = {
-				:visual_scene => ['COLLADA/library_visual_scenes/visual_scene', VisualScene],
-				:geometry => ['COLLADA/library_geometries/geometry', Geometry],
-				:animation => ['COLLADA/library_animations/animation', Animation],
+				:visual_scenes => ['COLLADA/library_visual_scenes/visual_scene', VisualScene],
+				:geometries => ['COLLADA/library_geometries/geometry', Geometry],
+				:animations => ['COLLADA/library_animations/animation', Animation],
+				:controllers => ['COLLADA/library_controllers/controller', Controller],
 			}
 			
-			def initialize(sections = {})
+			def initialize(doc, sections = {})
+				@doc = doc
 				@sections = sections
 			end
 			
 			def [] key
-				@sections[key]
+				@sections.fetch(key) do
+					path, klass = SECTIONS[key]
+					
+					raise ArgumentError.new("Invalid section name #{key}!") unless klass
+					
+					@sections[key] = OrderedMap.parse(@doc, path) do |element|
+						klass.parse(@doc, element)
+					end
+				end
 			end
 			
 			def self.parse(doc)
-				sections = {}
-				
-				SECTIONS.each do |key, (path, klass)|
-					sections[key] = OrderedMap.parse(doc, path) do |element|
-						klass.parse(doc, element)
-					end
-				end
-				
-				return Library.new(sections)
+				return Library.new(doc)
 			end
 		end
 	end
