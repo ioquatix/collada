@@ -20,7 +20,11 @@ Or install it yourself as:
 
 ## Usage
 
-The main loader is incomplete can can only load geometry data at this point in time.
+This library is designed to be used in scripts which extract data from collada files and output in some other format. As such, you'd typically create your own conversion script which takes the collada file as an argument. Then, use this library to extract relevant geometry and write it out.
+
+To assist with some basic tasks, the `collada-convert` executable provides a number of basic conversion functions. At present, `collada-convert` is primarily designed to produce [tagged format text][1].
+
+[1]: https://github.com/ioquatix/tagged-format
 
 ## Contributing
 
@@ -29,6 +33,11 @@ The main loader is incomplete can can only load geometry data at this point in t
 3. Commit your changes (`git commit -am 'Add some feature'`)
 4. Push to the branch (`git push origin my-new-feature`)
 5. Create new Pull Request
+
+### Desired Features
+
+* Converter: Support .obj files.
+* Support more of the collada standard.
 
 ## License
 
