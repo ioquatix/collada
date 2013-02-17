@@ -1,0 +1,157 @@
+#!/usr/bin/env ruby
+
+# Copyright, 2012, by Samuel G. D. Williams. <http://www.codeotaku.com>
+# 
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+# 
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+# 
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+# THE SOFTWARE.
+
+require 'collada/parser/library'
+
+require 'trollop'
+
+OPTIONS = Trollop::options do
+end
+
+module Application
+	class Mesh
+		def initialize(name)
+			@name = name
+		
+			@indices = []
+		
+			# vertex -> index
+			@vertices = {}
+		
+			# index -> vertex
+			@indexed = {}
+		
+			@count = 0
+		
+			@axes = []
+		end
+	
+		attr :name
+	
+		attr :indices
+		attr :vertices
+		attr :indexed
+		attr :axes
+	
+		attr :count
+	
+		def << vertex
+			if (index = vertices[vertex])
+				@indices << index
+			else
+				@vertices[vertex] = @count
+				@indexed[@count] = vertex
+				@indices << @count
+			
+				@count += 1
+			end
+		end
+	
+		def write(buffer)
+			buffer.puts "#{@name}: mesh triangles"
+			buffer.puts "	indices: array u2"
+			@indices.each_slice(12) do |slice|
+				buffer.puts "		#{slice.collect{|i| i.to_s.rjust(5)}.join}"
+			end
+			buffer.puts "	end"
+			buffer.puts "	vertices: array p3n3m2"
+			@count.times do |index|
+				buffer.puts "		#{@indexed[index].collect{|v| v.to_s.rjust(12)}.join(' ')}"
+			end
+			buffer.puts "	end"
+		
+			if @axes.size
+				buffer.puts "	axes: array axis"
+				@axes.each do |axis|
+					buffer.puts "		#{axis.collect{|i| i.to_s.rjust(12)}.join(' ')}"
+				end
+				buffer.puts "	end"
+			end
+		
+			buffer.puts "end"
+		end
+	end
+
+	class VertexFormat
+		def initialize(format)
+			@format = format
+		end
+	
+		def extract(attributes)
+			attributes = attributes.inject({}){|hash, attribute| hash[attribute.semantic] = attribute.value; hash}
+	
+			@format.collect do |(name, components)|
+				value = attributes[name]
+				components.collect{|key| value[key]}
+			end.flatten
+		end
+	end
+	
+	def self.dump
+		doc = REXML::Document.new(ARGF)
+		library = Collada::Parser::Library.parse(doc)
+		
+		output_format = VertexFormat.new [[:position, [:X, :Y, :Z]], [:normal, [:X, :Y, :Z]], [:texcoord, [:S, :T]]]
+		output_index = []
+		
+		library[:geometry].each do |geometry|
+			output_mesh = Mesh.new("ball")
+			
+			mesh.polygons.each do |polygon|
+				polygon.each do |vertex|
+					output_mesh << output_format.extract(vertex)
+				end
+			end
+			
+			puts "#{output_mesh.name}: mesh triangles"
+			puts "	indices: array u2"
+			output_mesh.indices.each_slice(15) do |slice|
+				puts "		#{slice.collect{|i| i.to_s.rjust(5)}.join}"
+			end
+			puts "	end"
+			puts "	vertices: array p3n3m2"
+			output_mesh.count.times do |index|
+				puts "		#{output_mesh.indexed[index].collect{|v| v.to_s.rjust(12)}.join}"
+			end
+			puts "	end"
+			puts "	axes: array axis"
+			puts "		origin 0.0 0.0 0.0 1.0 0.0 0.0 0.0"
+			puts "	end"
+			puts "end"
+			
+			output_index << output_mesh
+		end
+		
+		puts "top: offset-table"
+		output_index.each do |output_mesh|
+			puts "	#{output_mesh.name}: $#{output_mesh.name}"
+		end
+		puts "end"
+	end
+end
+
+time = Benchmark.measure do
+	action = ARGV.shift.to_sym
+	Application.send(action) if Application.methods.include?(action)
+end
+
+$stderr.puts time.format("Elapsed Time: %r").color(:magenta)
