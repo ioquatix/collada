@@ -43,21 +43,30 @@ module Collada
 		end
 		
 		class VisualScene
+			INSTANCE_ELEMENTS = [
+				['instance_geometry', :geometries],
+				['instance_controller', :controllers],
+			]
+			
 			class Node
-				def initialize(id, transforms, instance, children, attributes = {})
+				def initialize(id, type, transforms, instances, children, attributes = {})
 					@id = id
+					@type = type
+					
 					@transforms = transforms
 					
-					@instance = instance
+					@instances = instances
 					@children = children
 					
 					@attributes = attributes
 				end
 				
 				attr :id
+				attr :type
+				
 				attr :transforms
 				
-				attr :instance
+				attr :instances
 				attr :children
 				
 				attr :attributes
@@ -66,36 +75,29 @@ module Collada
 					Transforms.for(@transforms)
 				end
 				
-				def translation_vector
-					transforms = @transforms.select{|transform| transform[0] == :translate}
-					transforms = transforms.collect{|transform| transform[1]}
-					
-					transforms.inject(Vector[0.0, 0.0, 0.0]){|transform, sum| transform + sum}
-				end
-				
-				def rotation_matrix
-					rotations = @transforms.select{|transform| transform[0] == :rotate}
-					
-					Transforms.for(rotations)
-				end
-				
 				def self.parse_transforms(doc, element)
 					transforms = []
 					
-					element.elements.each('translate | rotate | scale') do |transform_element|
+					element.elements.each('translate | rotate | scale | matrix') do |transform_element|
 						values = transform_element.text.strip.split(/\s+/).collect &:to_f
-						transforms << [transform_element.name.to_sym, Vector[*values]]
+						transforms << [transform_element.name.to_sym, values]
 					end
 					
 					return transforms
 				end
 				
-				def self.parse_instance(doc, element)
-					if (instance_geometry_element = element.elements['instance_geometry'])
-						url = instance_geometry_element.attributes['url']
+				def self.parse_instances(doc, element)
+					instances = []
+					
+					INSTANCE_ELEMENTS.each do |(element_name, reference_type)|
+						element.elements.each(element_name) do |instance_element|
+							url = instance_element.attributes['url']
 						
-						Reference.new(:geometry, url.sub(/^#/, ''))
+							instances << Reference.new(reference_type, url.gsub(/^#/, ''))
+						end
 					end
+					
+					return instances
 				end
 				
 				def self.parse_children(doc, element)
@@ -106,12 +108,13 @@ module Collada
 				
 				def self.parse(doc, element)
 					id = element.attributes['id']
+					type = element.attributes['type']
 					
 					transforms = parse_transforms(doc, element)
-					instance = parse_instance(doc, element)
+					instances = parse_instances(doc, element)
 					children = parse_children(doc, element)
 					
-					self.new(id, transforms, instance, children, element.attributes)
+					self.new(id, type, transforms, instances, children, element.attributes)
 				end
 			end
 			

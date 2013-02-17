@@ -184,28 +184,31 @@ module Collada
 		class Accessor
 			include Enumerable
 			
-			def initialize(array, parameters, options = {})
+			def initialize(array, parameters, count, options = {})
 				@array = array
 				@parameters = parameters
+				@count = count
 				
-				@count = @parameters.inject(0) {|sum, parameter| sum + parameter.size}
+				# Chunk size and stride are usually the same in many cases.
+				@chunk_size = @parameters.inject(0) {|sum, parameter| sum + parameter.size}
 				
 				@offset = (options[:offset] || 0).to_i
-				@stride = (options[:stride] || parameters.size).to_i
+				@stride = (options[:stride] || @chunk_size).to_i
 			end
 			
 			attr :array
 			attr :parameters
 			attr :names
 			
+			attr :count
 			attr :offset
 			attr :stride
 			
 			def read index
 				base = @offset + (index * @stride)
-				values = @array[base, @count]
+				values = @array[base, @chunk_size]
 				
-				Hash[@parameters.collect{|parameter| [parameter.name, parameter.read(values.shift(parameter.size))]}]
+				@parameters.collect{|parameter| [parameter.name, parameter.read(values.shift(parameter.size))]}
 			end
 			
 			def [] index
@@ -240,13 +243,14 @@ module Collada
 				raise UnsupportedFeature.new("Source array binding must be valid (id=#{array_id})") unless array
 				
 				parameters = parse_parameters(doc, element)
+				count = element.attributes['count'].to_i
 				
 				options = {
 					:offset => element.attributes['offset'],
 					:stride => element.attributes['stride'],
 				}
 				
-				self.new(array, parameters, options)
+				self.new(array, parameters, count, options)
 			end
 		end
 		
@@ -266,6 +270,17 @@ module Collada
 				self.new(element.attributes['id'], accessor)
 			end
 			
+			def self.parse_arrays(doc, element)
+				OrderedMap.parse(element, '//float_array | //int_array | //Name_array') do |array_element|
+					case array_element.name
+					when 'Name_array'
+						array_element.text.strip.split(/\s+/)
+					else
+						array_element.text.strip.split(/\s+/).collect &:to_f
+					end
+				end
+			end
+			
 			def [] index
 				Hash[@accessor[index]]
 			end
@@ -282,6 +297,10 @@ module Collada
 			attr :semantic
 			attr :source
 			attr :offset
+			
+			def count
+				@source.accessor.count
+			end
 			
 			def [] index
 				Attribute.new(@semantic, @source[index])
@@ -304,6 +323,8 @@ module Collada
 		end
 		
 		class Sampler
+			include Enumerable
+			
 			def initialize(id, inputs)
 				@id = id
 				@inputs = inputs
@@ -327,11 +348,21 @@ module Collada
 				
 			def self.parse(doc, element, sources = {})
 				inputs = parse_inputs(doc, element, sources)
-						
+				
 				self.new(element.attributes['id'], inputs)
 			end
-		end
 			
+			def count
+				@inputs.collect{|input| input.count}.max
+			end
+			
+			def each
+				count.times do |i|
+					yield self[i]
+				end
+			end
+		end
+		
 		class Channel
 			def initialize(source, target)
 				@source = source
@@ -342,7 +373,7 @@ module Collada
 			attr :target
 				
 			def self.parse(doc, element, sources = {})
-				source_id = element.attributes['source'].sub(/^\#/, '')
+				source_id = element.attributes['source'].sub(/^#/, '')
 				target_id = element.attributes['target']
 				
 				self.new(sources[source_id], target_id)

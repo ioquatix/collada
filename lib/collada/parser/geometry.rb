@@ -176,14 +176,8 @@ module Collada
 				attr :sources
 				attr :polygons
 				
-				def self.parse_arrays(doc, element)
-					OrderedMap.parse(element, '//float_array | //int_array', 'id') do |array_element|
-						array_element.text.strip.split(/\s+/).collect &:to_f
-					end
-				end
-				
 				def self.parse(doc, element)
-					arrays = parse_arrays(doc, element)
+					arrays = Source.parse_arrays(doc, element)
 					
 					sources = OrderedMap.parse(element, 'source') do |source_element|
 						Source.parse(doc, source_element, arrays)

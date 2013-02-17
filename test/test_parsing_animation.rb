@@ -27,6 +27,9 @@ require 'stringio'
 require 'collada/parser'
 
 class TestParsingGeometry < Test::Unit::TestCase
+	Attribute = Collada::Parser::Attribute
+	
+	# We are going to load the animation file and check that it has some bones.
 	def test_library_animation
 		path = File.expand_path("../animation.dae", __FILE__)
 		
@@ -35,6 +38,7 @@ class TestParsingGeometry < Test::Unit::TestCase
 		
 		assert_equal 11, library[:animations].size
 		
+		# Extract out the animations that transform the bones:
 		channels = {}
 		library[:animations].each do |animation|
 			animation.channels.each do |channel|
@@ -42,7 +46,39 @@ class TestParsingGeometry < Test::Unit::TestCase
 			end
 		end
 		
+		# Do they exist?
 		assert channels['BoneA/transform']
 		assert channels['BoneB/transform']
+		
+		# Are there three matricies?
+		assert_equal 3, channels['BoneB/transform'].source.count
+		
+		# Extract the bones from the visual scene:
+		bone_a = library[:visual_scenes].first.nodes['Armature'].children.first
+		bone_b = bone_a.children.first
+		
+		# This tells us the position of the bone in the scene:
+		assert_equal "BoneA", bone_a.id
+		assert_equal "JOINT", bone_a.type
+		puts bone_a.transform_matrix
+		
+		# ... but it doesn't tell us anything about how its connected to any related object:
+		assert_equal "BoneB", bone_b.id
+		assert_equal "JOINT", bone_b.type
+		puts bone_b.transform_matrix
+		
+		# for that, we need to inspect a controller.
+		
+		controller = library[:visual_scenes].first.nodes['Cylinder'].instances.first.lookup(library)
+		assert controller
+		
+		assert_equal Collada::Parser::Controller::Skin, controller.class
+		
+		weights = [
+			[Attribute.joint({:JOINT=>"BoneA"}), Attribute.weight({:WEIGHT=>0.9576348})],
+			[Attribute.joint({:JOINT=>"BoneB"}), Attribute.weight({:WEIGHT=>0.04236513})]
+		]
+		
+		assert_equal weights, controller.weights.to_a[159]
 	end
 end

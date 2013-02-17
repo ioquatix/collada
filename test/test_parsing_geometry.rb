@@ -38,7 +38,7 @@ class TestParsingGeometry < Test::Unit::TestCase
 		
 		accessor = Collada::Parser::Accessor.new(
 			[1, 2, 3, 4, 5, 6],
-			parameters
+			parameters, 2
 		)
 		
 		assert_equal [[:x, 1], [:z, 3]], accessor[0]

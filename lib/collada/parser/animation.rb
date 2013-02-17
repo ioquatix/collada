@@ -35,19 +35,8 @@ module Collada
 			attr :samplers
 			attr :channels
 			
-			def self.parse_arrays(doc, element)
-				OrderedMap.parse(element, '//float_array | //int_array | //Name_array') do |array_element|
-					case array_element.name
-					when 'Name_array'
-						array_element.text.strip.split(/\s+/)
-					else
-						array_element.text.strip.split(/\s+/).collect &:to_f
-					end
-				end
-			end
-			
 			def self.parse(doc, element)
-				arrays = parse_arrays(doc, element)
+				arrays = Source.parse_arrays(doc, element)
 				
 				sources = OrderedMap.parse(element, 'source') do |source_element|
 					Source.parse(doc, source_element, arrays)

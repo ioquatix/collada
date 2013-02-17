@@ -94,6 +94,10 @@ module Collada
 			]
 		end
 		
+		def self.matrix(*arguments)
+			Matrix[*(arguments.each_slice(4).to_a)]
+		end
+		
 		def self.for(transforms)
 			product = Matrix.identity(4)
 			
