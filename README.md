@@ -26,6 +26,50 @@ To assist with some basic tasks, the `collada-convert` executable provides a num
 
 [1]: https://github.com/ioquatix/tagged-format
 
+### Example Conversion
+
+Several example `.dae` files are included and used as part of the unit tests. The `collada-convert` executable can dump the geometries contained within easily:
+
+	$ > collada-convert dump ./test/sample.dae
+	Cube-mesh: mesh triangles
+		indices: array u2
+			    0    1    2    3    4    5    6    7    8    9   10   11   12   13   14
+			   15   16   17   18   19   20   21   22   23
+		end
+		vertices: array p3n3
+			         1.0         1.0        -1.0         0.0         0.0        -1.0
+			         1.0        -1.0        -1.0         0.0         0.0        -1.0
+			        -1.0        -1.0        -1.0         0.0         0.0        -1.0
+			        -1.0         1.0        -1.0         0.0         0.0        -1.0
+			         1.0         1.0         1.0         0.0         0.0         1.0
+			        -1.0         1.0         1.0         0.0         0.0         1.0
+			        -1.0        -1.0         1.0         0.0         0.0         1.0
+			         1.0        -1.0         1.0         0.0         0.0         1.0
+			         1.0         1.0        -1.0         1.0        -0.0         0.0
+			         1.0         1.0         1.0         1.0        -0.0         0.0
+			         1.0        -1.0         1.0         1.0        -0.0         0.0
+			         1.0        -1.0        -1.0         1.0        -0.0         0.0
+			         1.0        -1.0        -1.0        -0.0        -1.0         0.0
+			         1.0        -1.0         1.0        -0.0        -1.0         0.0
+			        -1.0        -1.0         1.0        -0.0        -1.0         0.0
+			        -1.0        -1.0        -1.0        -0.0        -1.0         0.0
+			        -1.0        -1.0        -1.0        -1.0         0.0         0.0
+			        -1.0        -1.0         1.0        -1.0         0.0         0.0
+			        -1.0         1.0         1.0        -1.0         0.0         0.0
+			        -1.0         1.0        -1.0        -1.0         0.0         0.0
+			         1.0         1.0         1.0         0.0         1.0         0.0
+			         1.0         1.0        -1.0         0.0         1.0         0.0
+			        -1.0         1.0        -1.0         0.0         1.0         0.0
+			        -1.0         1.0         1.0         0.0         1.0         0.0
+		end
+		axes: array axis
+			origin 0.0 0.0 0.0 1.0 0.0 0.0 0.0
+		end
+	end
+	top: offset-table
+		Cube-mesh: $Cube-mesh
+	end
+
 ## Contributing
 
 1. Fork it
