@@ -22,10 +22,9 @@
 
 require 'collada/parser/library'
 
+require 'rainbow'
+require 'benchmark'
 require 'trollop'
-
-OPTIONS = Trollop::options do
-end
 
 module Application
 	class Mesh
@@ -97,8 +96,8 @@ module Application
 		end
 	
 		def extract(attributes)
-			attributes = attributes.inject({}){|hash, attribute| hash[attribute.semantic] = attribute.value; hash}
-	
+			attributes = Hash[attributes.collect{|attribute| [attribute.semantic, attribute.value]}]
+			
 			@format.collect do |(name, components)|
 				value = attributes[name]
 				components.collect{|key| value[key]}
@@ -106,31 +105,41 @@ module Application
 		end
 	end
 	
+	VERTEX_FORMATS = {
+		"p3n3" => VertexFormat.new([[:position, [:X, :Y, :Z]], [:normal, [:X, :Y, :Z]]]),
+		"p3n3m2" => VertexFormat.new([[:position, [:X, :Y, :Z]], [:normal, [:X, :Y, :Z]], [:texcoord, [:S, :T]]]),
+	}
+	
 	def self.dump
+		options = Trollop::options do
+			opt :vertex_format, "Vertices format, one of #{VERTEX_FORMATS.keys.join(', ')}.", :default => "p3n3"
+		end
+		
 		doc = REXML::Document.new(ARGF)
 		library = Collada::Parser::Library.parse(doc)
 		
-		output_format = VertexFormat.new [[:position, [:X, :Y, :Z]], [:normal, [:X, :Y, :Z]], [:texcoord, [:S, :T]]]
+		# output_format = VertexFormat.new [[:position, [:X, :Y, :Z]], [:normal, [:X, :Y, :Z]], [:texcoord, [:S, :T]]]
+		output_format = VERTEX_FORMATS[options[:vertex_format]]
 		output_index = []
 		
-		library[:geometry].each do |geometry|
-			output_mesh = Mesh.new("ball")
+		library[:geometries].each do |geometry|
+			mesh = Mesh.new(geometry.id)
 			
-			mesh.polygons.each do |polygon|
+			geometry.mesh.polygons.each do |polygon|
 				polygon.each do |vertex|
-					output_mesh << output_format.extract(vertex)
+					mesh << output_format.extract(vertex)
 				end
 			end
 			
-			puts "#{output_mesh.name}: mesh triangles"
+			puts "#{mesh.name}: mesh triangles"
 			puts "	indices: array u2"
-			output_mesh.indices.each_slice(15) do |slice|
+			mesh.indices.each_slice(15) do |slice|
 				puts "		#{slice.collect{|i| i.to_s.rjust(5)}.join}"
 			end
 			puts "	end"
-			puts "	vertices: array p3n3m2"
-			output_mesh.count.times do |index|
-				puts "		#{output_mesh.indexed[index].collect{|v| v.to_s.rjust(12)}.join}"
+			puts "	vertices: array #{options[:vertex_format]}"
+			mesh.count.times do |index|
+				puts "		#{mesh.indexed[index].collect{|v| v.to_s.rjust(12)}.join}"
 			end
 			puts "	end"
 			puts "	axes: array axis"
@@ -138,12 +147,12 @@ module Application
 			puts "	end"
 			puts "end"
 			
-			output_index << output_mesh
+			output_index << mesh
 		end
 		
 		puts "top: offset-table"
-		output_index.each do |output_mesh|
-			puts "	#{output_mesh.name}: $#{output_mesh.name}"
+		output_index.each do |mesh|
+			puts "	#{mesh.name}: $#{mesh.name}"
 		end
 		puts "end"
 	end
