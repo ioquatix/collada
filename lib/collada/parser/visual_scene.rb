@@ -23,29 +23,46 @@ require 'collada/transforms'
 
 module Collada
 	module Parser
-		class Reference
-			def initialize(kind, id)
-				@kind = kind
-				
-				@id = id
-			end
-			
-			attr :kind
-			attr :id
-			
-			def lookup(library)
-				library[@kind].each do |item|
-					return item if item.id == @id
+		class VisualScene
+			class NodeReference < Reference
+				def initialize(url)
+					super :nodes, url
 				end
 				
-				return nil
+				def lookup(scene)
+					scene[id]
+				end
 			end
-		end
-		
-		class VisualScene
+			
+			class GeometryInstance < Reference
+				def initialize(url)
+					super :geometries, url
+				end
+				
+				def self.parse(doc, element)
+					self.new(element.attributes['url'])
+				end
+			end
+			
+			class ControllerInstance < Reference
+				def initialize(url, skeleton)
+					super :controllers, url
+					
+					@skeleton = skeleton
+				end
+				
+				attr :skeleton
+				
+				def self.parse(doc, element)
+					skeleton = NodeReference.new(element.elements['skeleton'].text)
+					
+					self.new(element.attributes['url'], skeleton)
+				end
+			end
+			
 			INSTANCE_ELEMENTS = [
-				['instance_geometry', :geometries],
-				['instance_controller', :controllers],
+				['instance_geometry', GeometryInstance],
+				['instance_controller', ControllerInstance],
 			]
 			
 			class Node
@@ -56,10 +73,18 @@ module Collada
 					@transforms = transforms
 					
 					@instances = instances
+					
 					@children = children
+					@children.each {|child| child.attach!(self)}
 					
 					@attributes = attributes
 				end
+				
+				def attach!(parent)
+					@parent = parent
+				end
+				
+				attr :parent
 				
 				attr :id
 				attr :type
@@ -71,8 +96,34 @@ module Collada
 				
 				attr :attributes
 				
-				def transform_matrix
+				def inspect
+					"\#<#{self.class} #{id} -> [#{children.keys.join(', ')}]>"
+				end
+				
+				def local_transform_matrix
 					Transforms.for(@transforms)
+				end
+				
+				def transform_matrix
+					if parent
+						parent.transform_matrix * local_transform_matrix
+					else
+						local_transform_matrix
+					end
+				end
+				
+				def parents(type = nil)
+					result = []
+					
+					parent = @parent
+					
+					while parent
+						result << parent if !type || parent.type == type
+						
+						parent = parent.parent
+					end
+					
+					return result
 				end
 				
 				def self.parse_transforms(doc, element)
@@ -89,11 +140,9 @@ module Collada
 				def self.parse_instances(doc, element)
 					instances = []
 					
-					INSTANCE_ELEMENTS.each do |(element_name, reference_type)|
+					INSTANCE_ELEMENTS.each do |(element_name, klass)|
 						element.elements.each(element_name) do |instance_element|
-							url = instance_element.attributes['url']
-						
-							instances << Reference.new(reference_type, url.gsub(/^#/, ''))
+							instances << klass.parse(doc, instance_element)
 						end
 					end
 					
@@ -101,14 +150,14 @@ module Collada
 				end
 				
 				def self.parse_children(doc, element)
-					OrderedMap.parse(element, 'node', 'id') do |node_element|
+					OrderedMap.parse(element, 'node') do |node_element|
 						Node.parse(doc, node_element)
 					end
 				end
 				
 				def self.parse(doc, element)
 					id = element.attributes['id']
-					type = element.attributes['type']
+					type = element.attributes['type'].downcase.to_sym
 					
 					transforms = parse_transforms(doc, element)
 					instances = parse_instances(doc, element)
@@ -120,16 +169,35 @@ module Collada
 			
 			def initialize(nodes)
 				@nodes = nodes
+				@named = {}
+				
+				traverse(@nodes) do |node|
+					@named[node.id] = node
+				end
 			end
 			
 			attr :nodes
+			attr :named
+			
+			def [] (id)
+				@named[id]
+			end
 			
 			def self.parse(doc, element)
 				nodes = Node.parse_children(doc, element)
 				
 				self.new(nodes)
 			end
+			
+			def traverse(nodes = @nodes, &block)
+				nodes.each do |node|
+					catch(:pass) do
+						yield node
+						
+						traverse(node.children, &block)
+					end
+				end
+			end
 		end
-
 	end
 end

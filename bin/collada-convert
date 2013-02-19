@@ -22,139 +22,111 @@
 
 require 'collada/parser/library'
 
+require 'collada/conversion/mesh'
+require 'collada/conversion/skeleton'
+
 require 'rainbow'
 require 'benchmark'
 require 'trollop'
 
 module Application
-	class Mesh
-		def initialize(name)
-			@name = name
-		
-			@indices = []
-		
-			# vertex -> index
-			@vertices = {}
-		
-			# index -> vertex
-			@indexed = {}
-		
-			@count = 0
-		
-			@axes = []
-		end
-	
-		attr :name
-	
-		attr :indices
-		attr :vertices
-		attr :indexed
-		attr :axes
-	
-		attr :count
-	
-		def << vertex
-			if (index = vertices[vertex])
-				@indices << index
-			else
-				@vertices[vertex] = @count
-				@indexed[@count] = vertex
-				@indices << @count
-			
-				@count += 1
-			end
-		end
-	
-		def write(buffer)
-			buffer.puts "#{@name}: mesh triangles"
-			buffer.puts "	indices: array u2"
-			@indices.each_slice(12) do |slice|
-				buffer.puts "		#{slice.collect{|i| i.to_s.rjust(5)}.join}"
-			end
-			buffer.puts "	end"
-			buffer.puts "	vertices: array p3n3m2"
-			@count.times do |index|
-				buffer.puts "		#{@indexed[index].collect{|v| v.to_s.rjust(12)}.join(' ')}"
-			end
-			buffer.puts "	end"
-		
-			if @axes.size
-				buffer.puts "	axes: array axis"
-				@axes.each do |axis|
-					buffer.puts "		#{axis.collect{|i| i.to_s.rjust(12)}.join(' ')}"
-				end
-				buffer.puts "	end"
-			end
-		
-			buffer.puts "end"
-		end
-	end
-
-	class VertexFormat
-		def initialize(format)
-			@format = format
-		end
-	
-		def extract(attributes)
-			attributes = Hash[attributes.collect{|attribute| [attribute.semantic, attribute.value]}]
-			
-			@format.collect do |(name, components)|
-				value = attributes[name]
-				components.collect{|key| value[key]}
-			end.flatten
-		end
-	end
-	
 	VERTEX_FORMATS = {
-		"p3n3" => VertexFormat.new([[:position, [:X, :Y, :Z]], [:normal, [:X, :Y, :Z]]]),
-		"p3n3m2" => VertexFormat.new([[:position, [:X, :Y, :Z]], [:normal, [:X, :Y, :Z]], [:texcoord, [:S, :T]]]),
+		"p3n3" => Collada::Conversion::VertexFormat[position: [:X, :Y, :Z], normal: [:X, :Y, :Z]],
+		"p3n3i" => Collada::Conversion::VertexFormat[position: [:X, :Y, :Z], normal: [:X, :Y, :Z], vertex: [:index]],
+		"p3n3m2" => Collada::Conversion::VertexFormat[position: [:X, :Y, :Z], normal: [:X, :Y, :Z], texcoord: [:S, :T]],
+		"p3n3m2i" => Collada::Conversion::VertexFormat[position: [:X, :Y, :Z], normal: [:X, :Y, :Z], texcoord: [:S, :T], vertex: [:index]],
 	}
+	
+	WEIGHT_FORMATS = {
+		"b2w2" => Collada::Conversion::WeightFormat[2],
+		"b4w4" => Collada::Conversion::WeightFormat[4]
+	}
+	
+	def self.dump_geometry(options, library, scene, node, instance)
+		geometry = instance.lookup(library)
+		vertex_format = options[:vertex_format]
+		
+		mesh = Collada::Conversion::Mesh.new
+		
+		geometry.mesh.polygons.each do |polygon|
+			#raise ArgumentError.new("Non-triangle polygons are not supported!") if polygon.size != 3
+			
+			polygon.each do |vertex|
+				mesh << Collada::Conversion::Vertex.new(vertex, VERTEX_FORMATS[vertex_format])
+			end
+		end
+		
+		puts "#{node.id}: mesh triangles"
+		puts "	indices: array u2"
+		mesh.indices.each_slice(16) do |slice|
+			puts "		#{slice.collect{|i| i.to_s.rjust(5)}.join}"
+		end
+		puts "	end"
+		puts "	vertices: array #{vertex_format}"
+		mesh.size.times do |index|
+			puts "		#{mesh.indexed[index].to_a.collect{|v| v.to_s.rjust(12)}.join(' ')}"
+		end
+		puts "	end"
+		puts "end"
+		
+		return geometry, mesh
+	end
+	
+	def self.dump_controller(options, library, scene, node, instance)
+		controller = instance.lookup(library)
+		top_joint = scene[instance.skeleton.id]
+		
+		geometry, mesh = dump_geometry(options, library, scene, node, controller.source)
+		
+		skeleton = Collada::Conversion::Skeleton.new(library, scene, top_joint, controller)
+		
+		puts "*** Bones ***", skeleton.bones.inspect
+		
+		# Extract out the animations that transform the bones:
+		channels = {}
+		library[:animations].each do |animation|
+			animation.channels.each do |channel|
+				channels[channel.target] = channel
+			end
+		end
+		
+		keyframes = []
+		skeleton.bones.each do |(parent, bone)|
+			channel = channels["#{bone.id}/transform"]
+			
+			channel.source.count.times do |index|
+				attributes = Collada::Parser::Attribute.merge(channel.source[index])
+				puts [bone.id, index, attributes].inspect
+			end
+		end
+	end
 	
 	def self.dump
 		options = Trollop::options do
 			opt :vertex_format, "Vertices format, one of #{VERTEX_FORMATS.keys.join(', ')}.", :default => "p3n3"
+			opt :weight_format, "Bone weight format, one of #{WEIGHT_FORMATS.keys.join(', ')}.", :default => nil
 		end
 		
 		doc = REXML::Document.new(ARGF)
 		library = Collada::Parser::Library.parse(doc)
 		
 		# output_format = VertexFormat.new [[:position, [:X, :Y, :Z]], [:normal, [:X, :Y, :Z]], [:texcoord, [:S, :T]]]
-		output_format = VERTEX_FORMATS[options[:vertex_format]]
-		output_index = []
+		vertex_format = VERTEX_FORMATS[options[:vertex_format]]
 		
-		library[:geometries].each do |geometry|
-			mesh = Mesh.new(geometry.id)
-			
-			geometry.mesh.polygons.each do |polygon|
-				polygon.each do |vertex|
-					mesh << output_format.extract(vertex)
+		library[:visual_scenes].each do |scene|
+			scene.traverse do |node|
+				$stderr.puts node.inspect.color(:blue)
+				
+				node.instances.each do |instance|
+					case instance
+					when Collada::Parser::VisualScene::GeometryInstance
+						dump_geometry(options, library, scene, node, instance)
+					when Collada::Parser::VisualScene::ControllerInstance
+						dump_controller(options, library, scene, node, instance)
+					end
 				end
 			end
-			
-			puts "#{mesh.name}: mesh triangles"
-			puts "	indices: array u2"
-			mesh.indices.each_slice(15) do |slice|
-				puts "		#{slice.collect{|i| i.to_s.rjust(5)}.join}"
-			end
-			puts "	end"
-			puts "	vertices: array #{options[:vertex_format]}"
-			mesh.count.times do |index|
-				puts "		#{mesh.indexed[index].collect{|v| v.to_s.rjust(12)}.join}"
-			end
-			puts "	end"
-			puts "	axes: array axis"
-			puts "		origin 0.0 0.0 0.0 1.0 0.0 0.0 0.0"
-			puts "	end"
-			puts "end"
-			
-			output_index << mesh
 		end
-		
-		puts "top: offset-table"
-		output_index.each do |mesh|
-			puts "	#{mesh.name}: $#{mesh.name}"
-		end
-		puts "end"
 	end
 end
 

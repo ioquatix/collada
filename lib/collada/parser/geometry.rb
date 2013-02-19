@@ -36,11 +36,15 @@ module Collada
 					attr :id
 					attr :inputs
 					
+					def size
+						@inputs.collect{|input| input.size}.max
+					end
+					
 					# Vertices by index, same interface as Input.
 					def [] index
 						@inputs.collect do |input|
 							input[index]
-						end
+						end + [Attribute.new(:vertex, :index => index)]
 					end
 					
 					def self.parse_inputs(doc, element, sources = {})
@@ -114,7 +118,7 @@ module Collada
 					end
 					
 					# Vertices by index:
-					def vertex index
+					def vertex(index)
 						offset = @stride * index
 						
 						attributes = @inputs.collect do |input|
@@ -124,8 +128,9 @@ module Collada
 						return Attribute.flatten(attributes)
 					end
 					
-					# Iterate over each polygon/triangle:
-					def each
+					def each_indices
+						return to_enum(:each_indices) unless block_given?
+						
 						vertex_offset = 0
 						
 						@count.times do |index|
@@ -134,12 +139,21 @@ module Collada
 							
 							# Grap all the vertices
 							polygon = vertex_count.times.collect do |vertex_index|
-								vertex(vertex_offset + vertex_index)
+								vertex_offset + vertex_index
 							end
 							
 							yield polygon
 							
 							vertex_offset += vertex_count
+						end
+					end
+					
+					# Iterate over each polygon/triangle:
+					def each
+						each_indices do |indices|
+							vertices = indices.collect {|index| vertex(index)}
+							
+							yield vertices
 						end
 					end
 					
@@ -168,12 +182,14 @@ module Collada
 					end
 				end
 				
-				def initialize(sources, polygons)
+				def initialize(sources, vertices, polygons)
 					@sources = sources
+					@vertices = vertices
 					@polygons = polygons
 				end
 				
 				attr :sources
+				attr :vertices
 				attr :polygons
 				
 				def self.parse(doc, element)
@@ -192,7 +208,7 @@ module Collada
 						polygons = Polygons.parse(doc, polygons_element, sources)
 					end
 					
-					self.new(sources, polygons)
+					self.new(sources, vertices, polygons)
 				end
 			end
 			

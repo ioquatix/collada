@@ -165,38 +165,21 @@ class TestParsingGeometry < Test::Unit::TestCase
 		
 		expected = [
 			[
-				[Attribute.position({:X=>1.0, :Y=>1.0, :Z=>-1.0}), Attribute.normal({:X=>0.0, :Y=>0.0, :Z=>-1.0})],
-				[Attribute.position({:X=>1.0, :Y=>-1.0, :Z=>-1.0}), Attribute.normal({:X=>0.0, :Y=>0.0, :Z=>-1.0})],
-				[Attribute.position({:X=>-1.0, :Y=>-1.0, :Z=>-1.0}), Attribute.normal({:X=>0.0, :Y=>0.0, :Z=>-1.0})],
-				[Attribute.position({:X=>-1.0, :Y=>1.0, :Z=>-1.0}), Attribute.normal({:X=>0.0, :Y=>0.0, :Z=>-1.0})]],
+				[Attribute.position({:X=>1.0, :Y=>1.0, :Z=>-1.0}), Attribute.vertex(index: 0), Attribute.normal({:X=>0.0, :Y=>0.0, :Z=>-1.0})],
+				[Attribute.position({:X=>1.0, :Y=>-1.0, :Z=>-1.0}), Attribute.vertex(index: 1), Attribute.normal({:X=>0.0, :Y=>0.0, :Z=>-1.0})],
+				[Attribute.position({:X=>-1.0, :Y=>-1.0, :Z=>-1.0}), Attribute.vertex(index: 2), Attribute.normal({:X=>0.0, :Y=>0.0, :Z=>-1.0})],
+				[Attribute.position({:X=>-1.0, :Y=>1.0, :Z=>-1.0}), Attribute.vertex(index: 3), Attribute.normal({:X=>0.0, :Y=>0.0, :Z=>-1.0})]
+			],
 			[
-				[Attribute.position({:X=>1.0, :Y=>1.0, :Z=>1.0}), Attribute.normal({:X=>0.0, :Y=>0.0, :Z=>1.0})],
-				[Attribute.position({:X=>-1.0, :Y=>1.0, :Z=>1.0}), Attribute.normal({:X=>0.0, :Y=>0.0, :Z=>1.0})],
-				[Attribute.position({:X=>-1.0, :Y=>-1.0, :Z=>1.0}), Attribute.normal({:X=>0.0, :Y=>0.0, :Z=>1.0})],
-				[Attribute.position({:X=>1.0, :Y=>-1.0, :Z=>1.0}), Attribute.normal({:X=>0.0, :Y=>0.0, :Z=>1.0})]],
-			[
-				[Attribute.position({:X=>1.0, :Y=>1.0, :Z=>-1.0}), Attribute.normal({:X=>1.0, :Y=>-0.0, :Z=>0.0})],
-				[Attribute.position({:X=>1.0, :Y=>1.0, :Z=>1.0}), Attribute.normal({:X=>1.0, :Y=>-0.0, :Z=>0.0})],
-				[Attribute.position({:X=>1.0, :Y=>-1.0, :Z=>1.0}), Attribute.normal({:X=>1.0, :Y=>-0.0, :Z=>0.0})],
-				[Attribute.position({:X=>1.0, :Y=>-1.0, :Z=>-1.0}), Attribute.normal({:X=>1.0, :Y=>-0.0, :Z=>0.0})]],
-			[
-				[Attribute.position({:X=>1.0, :Y=>-1.0, :Z=>-1.0}), Attribute.normal({:X=>-0.0, :Y=>-1.0, :Z=>0.0})],
-				[Attribute.position({:X=>1.0, :Y=>-1.0, :Z=>1.0}), Attribute.normal({:X=>-0.0, :Y=>-1.0, :Z=>0.0})],
-				[Attribute.position({:X=>-1.0, :Y=>-1.0, :Z=>1.0}), Attribute.normal({:X=>-0.0, :Y=>-1.0, :Z=>0.0})],
-				[Attribute.position({:X=>-1.0, :Y=>-1.0, :Z=>-1.0}), Attribute.normal({:X=>-0.0, :Y=>-1.0, :Z=>0.0})]],
-			[
-				[Attribute.position({:X=>-1.0, :Y=>-1.0, :Z=>-1.0}), Attribute.normal({:X=>-1.0, :Y=>0.0, :Z=>0.0})],
-				[Attribute.position({:X=>-1.0, :Y=>-1.0, :Z=>1.0}), Attribute.normal({:X=>-1.0, :Y=>0.0, :Z=>0.0})],
-				[Attribute.position({:X=>-1.0, :Y=>1.0, :Z=>1.0}), Attribute.normal({:X=>-1.0, :Y=>0.0, :Z=>0.0})],
-				[Attribute.position({:X=>-1.0, :Y=>1.0, :Z=>-1.0}), Attribute.normal({:X=>-1.0, :Y=>0.0, :Z=>0.0})]],
-			[
-				[Attribute.position({:X=>1.0, :Y=>1.0, :Z=>1.0}), Attribute.normal({:X=>0.0, :Y=>1.0, :Z=>0.0})],
-				[Attribute.position({:X=>1.0, :Y=>1.0, :Z=>-1.0}), Attribute.normal({:X=>0.0, :Y=>1.0, :Z=>0.0})],
-				[Attribute.position({:X=>-1.0, :Y=>1.0, :Z=>-1.0}), Attribute.normal({:X=>0.0, :Y=>1.0, :Z=>0.0})],
-				[Attribute.position({:X=>-1.0, :Y=>1.0, :Z=>1.0}), Attribute.normal({:X=>0.0, :Y=>1.0, :Z=>0.0})]]
+				[Attribute.position({:X=>1.0, :Y=>1.0, :Z=>1.0}), Attribute.vertex(index: 4), Attribute.normal({:X=>0.0, :Y=>0.0, :Z=>1.0})],
+				[Attribute.position({:X=>-1.0, :Y=>1.0, :Z=>1.0}), Attribute.vertex(index: 7), Attribute.normal({:X=>0.0, :Y=>0.0, :Z=>1.0})],
+				[Attribute.position({:X=>-1.0, :Y=>-1.0, :Z=>1.0}), Attribute.vertex(index: 6), Attribute.normal({:X=>0.0, :Y=>0.0, :Z=>1.0})],
+				[Attribute.position({:X=>1.0, :Y=>-1.0, :Z=>1.0}), Attribute.vertex(index: 5), Attribute.normal({:X=>0.0, :Y=>0.0, :Z=>1.0})]
+			],
 		]
 		
-		mesh.polygons.each_with_index do |polygon, index|
+		polygons = mesh.polygons.first(2)
+		polygons.each_with_index do |polygon, index|
 			assert_equal expected[index], polygon
 		end
 	end

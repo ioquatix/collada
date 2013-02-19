@@ -83,27 +83,32 @@ module Collada
 					end
 				end
 				
-				def initialize(id, name, bind_shape_transform, sources, joints, weights)
+				def initialize(id, name, source, bind_shape_transform, sources, joints, weights)
 					super id, name
 					
 					@bind_shape_transform = bind_shape_transform
 					
+					@source = source
 					@sources = sources
 					@joints = joints
 					
 					@weights = weights
 				end
 				
+				attr :source
+				
 				attr :bind_shape_transform
 				
 				attr :sources
 				attr :joints
 				
+				# May contain multiple weights per vertex.
 				attr :weights
 				
 				def self.parse(doc, controller_element, element)
 					id = controller_element.attributes['id']
 					name = controller_element.attributes['name']
+					source = Reference.new(:geometries, element.attributes['source'])
 					
 					bind_shape_transform = extract_float4x4_matrix(element.elements['bind_shape_matrix'].text)
 					
@@ -117,7 +122,7 @@ module Collada
 					
 					vertex_weights = VertexWeights.parse(doc, element.elements['vertex_weights'], sources)
 					
-					self.new(id, name, bind_shape_transform, sources, joints, vertex_weights)
+					self.new(id, name, source, bind_shape_transform, sources, joints, vertex_weights)
 				end
 				
 				private

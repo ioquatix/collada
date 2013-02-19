@@ -78,6 +78,32 @@ module Collada
 			end
 		end
 		
+		class Reference
+			def initialize(kind, url)
+				@kind = kind
+				@url = url
+			end
+			
+			attr :kind
+			attr :url
+			
+			def id
+				url.sub(/^.*\#/, '')
+			end
+			
+			def lookup(library)
+				library[@kind].each do |item|
+					return item if item.id == id
+				end
+				
+				return nil
+			end
+			
+			def to_s
+				"\#<#{self.class} #{@url.dump} in #{@kind}>"
+			end
+		end
+		
 		class Attribute
 			def initialize(semantic, value)
 				@semantic = semantic
@@ -114,9 +140,17 @@ module Collada
 					self
 				end
 			end
-					
+			
 			def self.flatten(attributes)
 				attributes.collect{|attribute| attribute.flatten}.flatten
+			end
+			
+			def self.to_hash(attributes)
+				Hash[attributes.collect{|attribute| [attribute.semantic, attribute.value]}]
+			end
+			
+			def self.merge(attributes)
+				attributes.collect{|attribute| attribute.value}.inject(:merge)
 			end
 		end
 		
@@ -298,7 +332,7 @@ module Collada
 			attr :source
 			attr :offset
 			
-			def count
+			def size
 				@source.accessor.count
 			end
 			
@@ -352,12 +386,12 @@ module Collada
 				self.new(element.attributes['id'], inputs)
 			end
 			
-			def count
-				@inputs.collect{|input| input.count}.max
+			def size
+				@inputs.collect{|input| input.size}.max
 			end
 			
 			def each
-				count.times do |i|
+				size.times do |i|
 					yield self[i]
 				end
 			end
@@ -376,7 +410,11 @@ module Collada
 				source_id = element.attributes['source'].sub(/^#/, '')
 				target_id = element.attributes['target']
 				
-				self.new(sources[source_id], target_id)
+				source = sources[source_id]
+				
+				raise ArgumentError.new("Could not find #{source_id} in #{sources.keys.inspect}!") unless source
+				
+				self.new(source, target_id)
 			end
 		end
 	end

@@ -25,16 +25,20 @@ require 'test/unit'
 require 'stringio'
 
 require 'collada/parser'
+require 'collada/conversion/skeleton'
 
 class TestParsingGeometry < Test::Unit::TestCase
+	def setup
+		@path = File.expand_path("../animation.dae", __FILE__)
+		@doc = REXML::Document.new(File.open(@path))
+		@library = Collada::Parser::Library.parse(@doc)
+	end
+	
 	Attribute = Collada::Parser::Attribute
 	
 	# We are going to load the animation file and check that it has some bones.
 	def test_library_animation
-		path = File.expand_path("../animation.dae", __FILE__)
-		
-		doc = REXML::Document.new(File.open(path))
-		library = Collada::Parser::Library.parse(doc)
+		library = @library
 		
 		assert_equal 11, library[:animations].size
 		
@@ -59,16 +63,15 @@ class TestParsingGeometry < Test::Unit::TestCase
 		
 		# This tells us the position of the bone in the scene:
 		assert_equal "BoneA", bone_a.id
-		assert_equal "JOINT", bone_a.type
+		assert_equal :joint, bone_a.type
 		puts bone_a.transform_matrix
 		
 		# ... but it doesn't tell us anything about how its connected to any related object:
 		assert_equal "BoneB", bone_b.id
-		assert_equal "JOINT", bone_b.type
+		assert_equal :joint, bone_b.type
 		puts bone_b.transform_matrix
 		
 		# for that, we need to inspect a controller.
-		
 		controller = library[:visual_scenes].first.nodes['Cylinder'].instances.first.lookup(library)
 		assert controller
 		
@@ -80,5 +83,15 @@ class TestParsingGeometry < Test::Unit::TestCase
 		]
 		
 		assert_equal weights, controller.weights.to_a[159]
+	end
+	
+	def test_skeleton
+		controller = @library[:controllers].first
+		geometry = controller.source.lookup(@library)
+		scene = @library[:visual_scenes].first
+		
+		skeleton = Collada::Conversion::Skeleton.new(@library, scene, scene['BoneA'], controller)
+		
+		assert_equal geometry.mesh.vertices.size, skeleton.indexed_weights.size
 	end
 end
