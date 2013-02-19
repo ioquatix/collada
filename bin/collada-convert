@@ -43,8 +43,8 @@ module Application
 	}
 	
 	def self.dump_geometry(options, library, scene, node, instance)
-		geometry = instance.lookup(library)
 		vertex_format = options[:vertex_format]
+		geometry = instance.lookup(library)
 		
 		mesh = Collada::Conversion::Mesh.new
 		
@@ -63,8 +63,8 @@ module Application
 		end
 		puts "	end"
 		puts "	vertices: array #{vertex_format}"
-		mesh.size.times do |index|
-			puts "		#{mesh.indexed[index].to_a.collect{|v| v.to_s.rjust(12)}.join(' ')}"
+		mesh.indexed.each do |vertex|
+			puts "		#{vertex.to_a.collect{|v| v.to_s.rjust(12)}.join(' ')}"
 		end
 		puts "	end"
 		puts "end"
@@ -73,6 +73,8 @@ module Application
 	end
 	
 	def self.dump_controller(options, library, scene, node, instance)
+		weight_format = WEIGHT_FORMATS[options[:weight_format]]
+		
 		controller = instance.lookup(library)
 		top_joint = scene[instance.skeleton.id]
 		
@@ -80,7 +82,23 @@ module Application
 		
 		skeleton = Collada::Conversion::Skeleton.new(library, scene, top_joint, controller)
 		
-		puts "*** Bones ***", skeleton.bones.inspect
+		indexed_weights = skeleton.indexed_weights
+		
+		puts "#{node.id}: skeleton"
+		puts "	weights: array #{options[:weight_format]}"
+		mesh.indexed.each do |vertex|
+			bones, weights = weight_format.extract(indexed_weights[vertex.index])
+			puts "		#{bones.collect{|b|b.to_s.rjust(5)}.join} #{weights.collect{|w|w.to_s.rjust(12)}.join(' ')}"
+		end
+		puts "	end"
+		
+		indexed_bones = {}
+		puts "	bones: array bone"
+		skeleton.bones.each.with_index do |(parent, bone), index|
+			indexed_bones[bone.id] = index
+			puts "		#{parent.to_s.rjust(5)} #{bone.transform_matrix.to_a.flatten.join(' ')}"
+		end
+		puts "	end"
 		
 		# Extract out the animations that transform the bones:
 		channels = {}
@@ -90,21 +108,28 @@ module Application
 			end
 		end
 		
-		keyframes = []
+		puts "	sequences: offset-table"
+		puts "		default: animation 0.0 1.0"
+		puts "			key-frames: array bone-key-frame"
 		skeleton.bones.each do |(parent, bone)|
 			channel = channels["#{bone.id}/transform"]
 			
 			channel.source.count.times do |index|
 				attributes = Collada::Parser::Attribute.merge(channel.source[index])
-				puts [bone.id, index, attributes].inspect
+				puts "				" + [indexed_bones[bone.id], attributes[:INTERPOLATION].downcase, attributes[:TIME], attributes[:TRANSFORM].to_a].flatten.join(' ')
 			end
 		end
+		puts "			end"
+		puts "		end"
+		puts "	end"
+		
+		puts "end"
 	end
 	
 	def self.dump
 		options = Trollop::options do
 			opt :vertex_format, "Vertices format, one of #{VERTEX_FORMATS.keys.join(', ')}.", :default => "p3n3"
-			opt :weight_format, "Bone weight format, one of #{WEIGHT_FORMATS.keys.join(', ')}.", :default => nil
+			opt :weight_format, "Bone weight format, one of #{WEIGHT_FORMATS.keys.join(', ')}.", :default => "b4w4"
 		end
 		
 		doc = REXML::Document.new(ARGF)

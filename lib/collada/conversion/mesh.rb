@@ -55,7 +55,7 @@ module Collada
 				end
 				
 				# Go from [[bone1, weight1], [bone2, weight2]] => [bone1, bone2, weight1, weight2]
-				vertex_weights.collect{|(bone,_)| bone} + vertex_weights.collect{|(_,weight)| weight}
+				return vertex_weights.collect{|(bone,_)| bone}, vertex_weights.collect{|(_,weight)| weight}
 			end
 			
 			def self.[] (count)
@@ -97,26 +97,25 @@ module Collada
 				@vertices = {}
 				
 				# index -> vertex
-				@indexed = {}
-				
-				@size = 0
+				@indexed = []
 			end
 			
 			attr :indices
 			attr :vertices
 			attr :indexed
 			
-			attr :size
+			def size
+				@indexed.size
+			end
 			
 			def << vertex
 				if index = vertices[vertex]
 					@indices << index
 				else
-					@vertices[vertex] = @size
-					@indexed[@size] = vertex
-					@indices << @size
-			
-					@size += 1
+					@vertices[vertex] = self.size
+					@indices << self.size
+					
+					@indexed << vertex
 				end
 			end
 		end
