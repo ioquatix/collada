@@ -29,12 +29,10 @@ require 'rainbow'
 require 'benchmark'
 require 'trollop'
 
-module Application
+class TaggedFormat
 	VERTEX_FORMATS = {
 		"p3n3" => Collada::Conversion::VertexFormat[position: [:X, :Y, :Z], normal: [:X, :Y, :Z]],
-		"p3n3i" => Collada::Conversion::VertexFormat[position: [:X, :Y, :Z], normal: [:X, :Y, :Z], vertex: [:index]],
 		"p3n3m2" => Collada::Conversion::VertexFormat[position: [:X, :Y, :Z], normal: [:X, :Y, :Z], texcoord: [:S, :T]],
-		"p3n3m2i" => Collada::Conversion::VertexFormat[position: [:X, :Y, :Z], normal: [:X, :Y, :Z], texcoord: [:S, :T], vertex: [:index]],
 	}
 	
 	WEIGHT_FORMATS = {
@@ -42,121 +40,168 @@ module Application
 		"b4w4" => Collada::Conversion::WeightFormat[4]
 	}
 	
-	def self.dump_geometry(options, library, scene, node, instance)
-		vertex_format = options[:vertex_format]
-		geometry = instance.lookup(library)
+	def initialize(options, library, output = nil)
+		@options = options
+		@library = library
 		
-		mesh = Collada::Conversion::Mesh.new
+		@output = output || $stdout
 		
-		geometry.mesh.polygons.each do |polygon|
-			#raise ArgumentError.new("Non-triangle polygons are not supported!") if polygon.size != 3
-			
-			polygon.each do |vertex|
-				mesh << Collada::Conversion::Vertex.new(vertex, VERTEX_FORMATS[vertex_format])
-			end
-		end
-		
-		puts "#{node.id}: mesh triangles"
-		puts "	indices: array u2"
-		mesh.indices.each_slice(16) do |slice|
-			puts "		#{slice.collect{|i| i.to_s.rjust(5)}.join}"
-		end
-		puts "	end"
-		puts "	vertices: array #{vertex_format}"
-		mesh.indexed.each do |vertex|
-			puts "		#{vertex.to_a.collect{|v| v.to_s.rjust(12)}.join(' ')}"
-		end
-		puts "	end"
-		puts "end"
-		
-		return geometry, mesh
+		@top = {}
+		@nodes = {}
 	end
 	
-	def self.dump_controller(options, library, scene, node, instance)
-		weight_format = WEIGHT_FORMATS[options[:weight_format]]
+	def dump_geometry(scene, node, instance)
+		vertex_format = VERTEX_FORMATS[@options[:vertex_format]]
+		geometry = instance.lookup(@library)
 		
-		controller = instance.lookup(library)
+		@output.puts "#{geometry.id}: mesh triangles"
+		@output.puts "	vertices: array #{@options[:vertex_format]}"
+		geometry.mesh.vertices.size.times do |index|
+			vertex = geometry.mesh.polygons.vertex(index)
+			@output.puts "		#{vertex_format.extract(vertex).to_a.collect{|v| v.to_s.rjust(12)}.join(' ')}"
+		end
+		@output.puts "	end"
+		@output.puts "	indices: array u2"
+		geometry.mesh.polygons.each_slice(3) do |indices|
+			@output.puts "		#{indices.flatten.collect{|i| i.to_s.rjust(5)}.join}"
+		end
+		@output.puts "	end"
+		@output.puts "end"
+		
+		@top[geometry.name || geometry.id] = geometry.id
+		
+		return geometry
+	end
+	
+	def dump_controller(scene, node, instance)
+		weight_format = WEIGHT_FORMATS[@options[:weight_format]]
+		
+		controller = instance.lookup(@library)
+		if controller.bind_pose_transform != Matrix.identity(4)
+			raise ArgumentError.new("Non-identity bind pose transform is not supported by this exporter!")
+		end
+		
 		top_joint = scene[instance.skeleton.id]
 		
-		geometry, mesh = dump_geometry(options, library, scene, node, controller.source)
+		geometry = dump_geometry(scene, node, controller.source)
 		
-		skeleton = Collada::Conversion::Skeleton.new(library, scene, top_joint, controller)
+		skeleton = Collada::Conversion::Skeleton.new(@library, scene, top_joint, controller)
 		
 		indexed_weights = skeleton.indexed_weights
 		
-		puts "#{node.id}: skeleton"
-		puts "	weights: array #{options[:weight_format]}"
-		mesh.indexed.each do |vertex|
-			bones, weights = weight_format.extract(indexed_weights[vertex.index])
-			puts "		#{bones.collect{|b|b.to_s.rjust(5)}.join} #{weights.collect{|w|w.to_s.rjust(12)}.join(' ')}"
+		@output.puts "#{controller.id}: skeleton"
+		@output.puts "	weights: array #{@options[:weight_format]}"
+		geometry.mesh.vertices.size.times do |index|
+			bones, weights = weight_format.extract(indexed_weights[index])
+			@output.puts "		#{bones.collect{|b|b.to_s.rjust(5)}.join} #{weights.collect{|w|w.to_s.rjust(12)}.join(' ')}"
 		end
-		puts "	end"
+		@output.puts "	end"
 		
 		indexed_bones = {}
-		puts "	bones: array bone"
+		@output.puts "	bones: array bone"
 		skeleton.bones.each.with_index do |(parent, bone), index|
 			indexed_bones[bone.id] = index
-			puts "		#{parent.to_s.rjust(5)} #{bone.transform_matrix.to_a.flatten.join(' ')}"
+			@output.puts "		#{bone.id} #{parent.to_s.rjust(5)}\t#{bone.transform_matrix.to_a.flatten.join(' ')}"
 		end
-		puts "	end"
+		@output.puts "	end"
 		
 		# Extract out the animations that transform the bones:
 		channels = {}
-		library[:animations].each do |animation|
+		@library[:animations].each do |animation|
 			animation.channels.each do |channel|
 				channels[channel.target] = channel
 			end
 		end
 		
-		puts "	sequences: offset-table"
-		puts "		default: animation 0.0 1.0"
-		puts "			key-frames: array bone-key-frame"
+		@output.puts "	sequences: offset-table"
+		@output.puts "		default: animation 0.0 1.0"
+		@output.puts "			key-frames: array bone-key-frame"
 		skeleton.bones.each do |(parent, bone)|
 			channel = channels["#{bone.id}/transform"]
 			
+			raise ArgumentError.new("Bone #{bone.id} doesn't have an associated animation channel!") unless channel
+			
 			channel.source.count.times do |index|
 				attributes = Collada::Parser::Attribute.merge(channel.source[index])
-				puts "				" + [indexed_bones[bone.id], attributes[:INTERPOLATION].downcase, attributes[:TIME], attributes[:TRANSFORM].to_a].flatten.join(' ')
+				@output.puts "				" + [indexed_bones[bone.id], attributes[:INTERPOLATION].downcase, attributes[:TIME], attributes[:TRANSFORM].to_a].flatten.join(' ')
 			end
 		end
-		puts "			end"
-		puts "		end"
-		puts "	end"
+		@output.puts "			end"
+		@output.puts "		end"
+		@output.puts "	end"
 		
-		puts "end"
+		@output.puts "end"
+		
+		@top[controller.name || controller.id] = controller.id
+		
+		return geometry, skeleton
 	end
 	
-	def self.dump
-		options = Trollop::options do
-			opt :vertex_format, "Vertices format, one of #{VERTEX_FORMATS.keys.join(', ')}.", :default => "p3n3"
-			opt :weight_format, "Bone weight format, one of #{WEIGHT_FORMATS.keys.join(', ')}.", :default => "b4w4"
+	def dump_instances(instances, indent = "")
+	end
+	
+	def dump_nodes(nodes, indent = "")
+		nodes.each do |node|
+			next unless node.type == :node
+			
+			@output.puts indent + "node #{node.id}"
+			@output.puts indent + "	#{node.local_transform_matrix.to_a.flatten.join(' ')}"
+			
+			dump_instances(node.instances, indent + "\t")
+			dump_nodes(node.children, indent + "\t")
+			
+			@output.puts indent + "end"
 		end
+	end
+	
+	def dump
+		@nodes = {}
 		
-		doc = REXML::Document.new(ARGF)
-		library = Collada::Parser::Library.parse(doc)
-		
-		# output_format = VertexFormat.new [[:position, [:X, :Y, :Z]], [:normal, [:X, :Y, :Z]], [:texcoord, [:S, :T]]]
-		vertex_format = VERTEX_FORMATS[options[:vertex_format]]
-		
-		library[:visual_scenes].each do |scene|
+		@library[:visual_scenes].each do |scene|
 			scene.traverse do |node|
 				$stderr.puts node.inspect.color(:blue)
 				
 				node.instances.each do |instance|
 					case instance
 					when Collada::Parser::VisualScene::GeometryInstance
-						dump_geometry(options, library, scene, node, instance)
+						geometry = dump_geometry(scene, node, instance)
 					when Collada::Parser::VisualScene::ControllerInstance
-						dump_controller(options, library, scene, node, instance)
+						geometry, skeleton = dump_controller(scene, node, instance)
 					end
 				end
 			end
+			
+			if @options[:nodes]
+				dump_nodes(scene.nodes)
+			end
 		end
+		
+		@output.puts "top: offset-table"
+		@top.each do |name, label|
+			@output.puts "	#{name}: $#{label}"
+		end
+		@output.puts "end"
+	end
+end
+
+module Application
+	def self.tagged_format
+		options = Trollop::options do
+			opt :vertex_format, "Vertices format, one of #{TaggedFormat::VERTEX_FORMATS.keys.join(', ')}.", :default => "p3n3"
+			opt :weight_format, "Bone weight format, one of #{TaggedFormat::WEIGHT_FORMATS.keys.join(', ')}.", :default => "b4w4"
+			
+			opt :nodes, "Dump scene graph data structure", :default => false
+		end
+		
+		doc = REXML::Document.new(ARGF)
+		library = Collada::Parser::Library.parse(doc)
+		
+		TaggedFormat.new(options, library).dump
 	end
 end
 
 time = Benchmark.measure do
-	action = ARGV.shift.to_sym
+	action = ARGV.shift.gsub(/-/, '_').to_sym
 	Application.send(action) if Application.methods.include?(action)
 end
 

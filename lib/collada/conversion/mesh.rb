@@ -29,6 +29,8 @@ module Collada
 			end
 			
 			def extract(attributes)
+				attributes = Collada::Parser::Attribute.to_hash(attributes) unless Hash === attributes
+				
 				@format.collect do |name, components|
 					value = attributes[name]
 				

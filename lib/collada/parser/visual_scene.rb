@@ -48,6 +48,7 @@ module Collada
 				def initialize(url, skeleton)
 					super :controllers, url
 					
+					# This references the node for the skeleton:
 					@skeleton = skeleton
 				end
 				
@@ -157,7 +158,7 @@ module Collada
 				
 				def self.parse(doc, element)
 					id = element.attributes['id']
-					type = element.attributes['type'].downcase.to_sym
+					type = (element.attributes['type'] || 'node').downcase.to_sym
 					
 					transforms = parse_transforms(doc, element)
 					instances = parse_instances(doc, element)

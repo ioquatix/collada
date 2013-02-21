@@ -87,12 +87,12 @@ module Collada
 				class Polygons
 					include Enumerable
 					
-					def initialize(inputs, indices, count, elements)
+					def initialize(inputs, indices, size, elements)
 						@inputs = inputs
 						@indices = indices
 						
 						# The total number of polygons:
-						@count = count
+						@size = size
 						
 						# The number of vertices per polygon:
 						@elements = elements
@@ -104,18 +104,14 @@ module Collada
 					attr :inputs
 					attr :indices
 					
-					# Element count:
-					attr :count
+					# Number of polygons
+					attr :size
 					
 					# Per-element data:
 					attr :elements
 					
 					# Number of indices consumed per vertex:
 					attr :stride
-					
-					def size
-						@count
-					end
 					
 					# Vertices by index:
 					def vertex(index)
@@ -128,32 +124,23 @@ module Collada
 						return Attribute.flatten(attributes)
 					end
 					
-					def each_indices
-						return to_enum(:each_indices) unless block_given?
+					def each
+						return to_enum(:each) unless block_given?
 						
 						vertex_offset = 0
 						
-						@count.times do |index|
+						@size.times do |index|
 							# There are n vertices per face:
 							vertex_count = @elements.vertex_count(index)
 							
 							# Grap all the vertices
 							polygon = vertex_count.times.collect do |vertex_index|
-								vertex_offset + vertex_index
+								@indices[vertex_offset + vertex_index]
 							end
 							
 							yield polygon
 							
 							vertex_offset += vertex_count
-						end
-					end
-					
-					# Iterate over each polygon/triangle:
-					def each
-						each_indices do |indices|
-							vertices = indices.collect {|index| vertex(index)}
-							
-							yield vertices
 						end
 					end
 					
@@ -212,8 +199,9 @@ module Collada
 				end
 			end
 			
-			def initialize(id, mesh, attributes)
+			def initialize(id, name, mesh, attributes)
 				@id = id
+				@name = name
 				
 				@mesh = mesh
 				
@@ -221,15 +209,18 @@ module Collada
 			end
 			
 			attr :id
+			attr :name
+			
 			attr :mesh
 			attr :attributes
 			
 			def self.parse(doc, element)
 				id = element.attributes['id']
+				name = element.attributes['name']
 				
 				mesh = Mesh.parse(doc, element.elements['mesh'])
 				
-				self.new(id, mesh, element.attributes)
+				self.new(id, name, mesh, element.attributes)
 			end
 		end
 	end
