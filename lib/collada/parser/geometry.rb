@@ -148,7 +148,7 @@ module Collada
 						return to_enum(:each) unless block_given?
 						
 						each_indices.each do |indices|
-							yield indices.collect {|_| vertex(_)}
+							yield indices.collect {|index| vertex(index)}
 						end
 					end
 					
