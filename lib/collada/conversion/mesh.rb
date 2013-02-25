@@ -28,7 +28,7 @@ module Collada
 				@format = format
 			end
 			
-			def extract(attributes)
+			def call(attributes)
 				attributes = Collada::Parser::Attribute.to_hash(attributes) unless Hash === attributes
 				
 				@format.collect do |name, components|
@@ -36,12 +36,31 @@ module Collada
 				
 					raise ArgumentError.new("Invalid vertex format, undefined property #{name} for #{attributes.inspect}!") unless value
 				
-					components.collect{|key| value[key]}
+					case components
+					when Array
+						components.collect{|key| value[key]}
+					else
+						components.call(value)
+					end
 				end.flatten
 			end
 		
 			def self.[] (format)
 				self.new(format)
+			end
+			
+			def merge(extra_format)
+				format = @format.dup
+				
+				extra_format.each do |key, value|
+					format[key] = value
+				end
+				
+				self.class.new(format)
+			end
+			
+			def with_vertex_index
+				merge(vertex: [:index])
 			end
 		end
 		
@@ -50,7 +69,7 @@ module Collada
 				@count = count
 			end
 			
-			def extract(vertex_weights)
+			def call(vertex_weights)
 				# Ensure that we have the correct number:
 				vertex_weights = @count.times.collect do |offset|
 					vertex_weights[offset] || [0, 0.0]
@@ -75,7 +94,7 @@ module Collada
 			attr :attributes
 			
 			def to_a
-				@format.extract(@attributes)
+				@format.call(@attributes)
 			end
 			
 			def <=>(other)
@@ -92,7 +111,7 @@ module Collada
 		end
 		
 		class Mesh
-			def initialize()
+			def initialize
 				@indices = []
 				
 				# vertex -> index
