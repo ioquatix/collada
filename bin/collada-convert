@@ -79,7 +79,7 @@ class TaggedFormat
 		@output.puts "	vertices: array #{@options[:vertex_format]}"
 		mesh.vertices.size.times do |index|
 			vertex = mesh.indexed[index]
-			@output.puts "		#{vertex.to_a.collect{|v| v.to_s.rjust(12)}.join(' ')}"
+			@output.puts "		#{vertex.to_a(@output_vertex_format).collect{|v| v.to_s.rjust(12)}.join(' ')}"
 		end
 		@output.puts "	end"
 		

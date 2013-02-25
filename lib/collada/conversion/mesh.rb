@@ -93,8 +93,8 @@ module Collada
 			
 			attr :attributes
 			
-			def to_a
-				@format.call(@attributes)
+			def to_a(format = @format)
+				format.call(@attributes)
 			end
 			
 			def <=>(other)
