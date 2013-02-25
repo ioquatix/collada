@@ -124,8 +124,8 @@ module Collada
 						return Attribute.flatten(attributes)
 					end
 					
-					def each
-						return to_enum(:each) unless block_given?
+					def each_indices
+						return to_enum(:each_indices) unless block_given?
 						
 						vertex_offset = 0
 						
@@ -134,13 +134,21 @@ module Collada
 							vertex_count = @elements.vertex_count(index)
 							
 							# Grap all the vertices
-							polygon = vertex_count.times.collect do |vertex_index|
-								@indices[vertex_offset + vertex_index]
+							polygon_indices = vertex_count.times.collect do |vertex_index|
+								vertex_offset + vertex_index
 							end
 							
-							yield polygon
+							yield polygon_indices
 							
 							vertex_offset += vertex_count
+						end
+					end
+					
+					def each
+						return to_enum(:each) unless block_given?
+						
+						each_indices.each do |indices|
+							yield indices.collect {|_| vertex(_)}
 						end
 					end
 					
