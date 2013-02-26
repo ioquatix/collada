@@ -40,7 +40,7 @@ class TestParsingGeometry < Test::Unit::TestCase
 	def test_library_animation
 		library = @library
 		
-		assert_equal 11, library[:animations].size
+		assert_equal 1, library[:animations].size
 		
 		# Extract out the animations that transform the bones:
 		channels = {}
@@ -50,24 +50,23 @@ class TestParsingGeometry < Test::Unit::TestCase
 			end
 		end
 		
-		# Do they exist?
-		assert channels['BoneA/transform']
-		assert channels['BoneB/transform']
+		# We have some animation attached to the secondary bone:
+		assert channels['Secondary-Bone/transform']
 		
 		# Are there three matricies?
-		assert_equal 3, channels['BoneB/transform'].source.count
+		assert_equal 3, channels['Secondary-Bone/transform'].source.count
 		
 		# Extract the bones from the visual scene:
 		bone_a = library[:visual_scenes].first.nodes['Armature'].children.first
 		bone_b = bone_a.children.first
 		
 		# This tells us the position of the bone in the scene:
-		assert_equal "BoneA", bone_a.id
+		assert_equal "Primary-Bone", bone_a.id
 		assert_equal :joint, bone_a.type
 		puts bone_a.transform_matrix
 		
 		# ... but it doesn't tell us anything about how its connected to any related object:
-		assert_equal "BoneB", bone_b.id
+		assert_equal "Secondary-Bone", bone_b.id
 		assert_equal :joint, bone_b.type
 		puts bone_b.transform_matrix
 		
@@ -78,8 +77,8 @@ class TestParsingGeometry < Test::Unit::TestCase
 		assert_equal Collada::Parser::Controller::Skin, controller.class
 		
 		weights = [
-			[Attribute.joint({:JOINT=>"BoneA"}), Attribute.weight({:WEIGHT=>0.9576348})],
-			[Attribute.joint({:JOINT=>"BoneB"}), Attribute.weight({:WEIGHT=>0.04236513})]
+			[Attribute.joint({:JOINT=>"Primary-Bone"}), Attribute.weight({:WEIGHT=>0.9576348})],
+			[Attribute.joint({:JOINT=>"Secondary-Bone"}), Attribute.weight({:WEIGHT=>0.04236513})]
 		]
 		
 		assert_equal weights, controller.weights.to_a[159]
@@ -90,7 +89,7 @@ class TestParsingGeometry < Test::Unit::TestCase
 		geometry = controller.source.lookup(@library)
 		scene = @library[:visual_scenes].first
 		
-		skeleton = Collada::Conversion::Skeleton.new(@library, scene, scene['BoneA'], controller)
+		skeleton = Collada::Conversion::Skeleton.new(@library, scene, scene['Primary-Bone'], controller)
 		
 		assert_equal geometry.mesh.vertices.size, skeleton.indexed_weights.size
 	end
