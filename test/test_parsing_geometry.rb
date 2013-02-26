@@ -156,6 +156,7 @@ class TestParsingGeometry < Test::Unit::TestCase
 	end
 	
 	def test_library_geometry
+		# The verticies in this file present an interesting phenomenon - the vertex positions are reused, but vertex normals are not. In this case, vertices are uniquely identified by their position, but the number of unique vertices for the purposes of rendering is much larger. This means that there is not a direct correspondence between vertices as per collada data and unique verticies including all attributes (position, normal, texture coordinates, etc).
 		path = File.expand_path("../sample.dae", __FILE__)
 		
 		doc = REXML::Document.new(File.open(path))
