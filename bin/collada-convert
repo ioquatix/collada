@@ -116,14 +116,20 @@ class TaggedFormat
 		
 		# Extract out the animations that transform the bones:
 		channels = {}
+		start_time = 0.0
+		end_time = 0.0
 		@library[:animations].each do |animation|
 			animation.channels.each do |channel|
 				channels[channel.target] = channel
+				
+				# Extract out the end time if possible:
+				attributes = Collada::Parser::Attribute.to_hash(channel.source[-1])
+				end_time = attributes[:input][:TIME] || 0.0
 			end
 		end
 		
 		@output.puts "	sequences: offset-table"
-		@output.puts "		default: skeleton-animation 0.0 1.0"
+		@output.puts "		default: skeleton-animation #{start_time} #{end_time}"
 		@output.puts "			key-frames: array skeleton-animation-key-frame"
 		skeleton.bones.each do |(parent, bone)|
 			channel = channels["#{bone.id}/transform"]
