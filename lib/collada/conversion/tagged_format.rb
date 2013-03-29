@@ -2,13 +2,15 @@
 module Collada
 	module Conversion
 		class TaggedFormat
+			TEXCOORD = lambda {|value| [value[:S], -value[:T] + 1.0]}
+
 			VERTEX_FORMATS = {
 				"p3n3" => VertexFormat[position: [:X, :Y, :Z], normal: [:X, :Y, :Z]],
-				"p3n3m2" => VertexFormat[position: [:X, :Y, :Z], normal: [:X, :Y, :Z], texcoord: [:S, :T]],
-				"p3n3m2b2" => VertexFormat[position: [:X, :Y, :Z], normal: [:X, :Y, :Z], texcoord: [:S, :T], bones: WeightFormat[4]],
-				"p3n3m2b4" => VertexFormat[position: [:X, :Y, :Z], normal: [:X, :Y, :Z], texcoord: [:S, :T], bones: WeightFormat[4]],
+				"p3n3m2" => VertexFormat[position: [:X, :Y, :Z], normal: [:X, :Y, :Z], texcoord: TEXCOORD],
+				"p3n3m2b2" => VertexFormat[position: [:X, :Y, :Z], normal: [:X, :Y, :Z], texcoord: TEXCOORD, bones: WeightFormat[4]],
+				"p3n3m2b4" => VertexFormat[position: [:X, :Y, :Z], normal: [:X, :Y, :Z], texcoord: TEXCOORD, bones: WeightFormat[4]],
 			}
-	
+
 			def initialize(options, library, output = nil)
 				@options = options
 				@library = library
