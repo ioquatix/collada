@@ -25,7 +25,13 @@ module Collada
 				@top = {}
 				@nodes = {}
 			end
-	
+
+			def extract_axes(scene, node, instance)
+				node.children.collect do |child|
+					[child.name, *Transforms.extract_axis(child.local_transform_matrix)]
+				end
+			end
+
 			def dump_geometry(scene, node, instance, skeleton = nil)
 				vertex_format = @output_vertex_format.with_vertex_index
 				geometry = instance.lookup(@library)
@@ -47,9 +53,9 @@ module Collada
 						mesh << vertex
 					end
 				end
-		
+
 				@output.puts "#{geometry.id}: mesh triangles"
-		
+
 				@output.puts "	indices: array index16"
 				mesh.indices.each_slice(12) do |indices|
 					@output.puts "		#{indices.flatten.collect{|i| i.to_s.rjust(5)}.join}"
@@ -60,6 +66,14 @@ module Collada
 				mesh.vertices.size.times do |index|
 					vertex = mesh.indexed[index]
 					@output.puts "		#{vertex.to_a(@output_vertex_format).collect{|v| v.to_s.rjust(12)}.join(' ')}"
+				end
+				@output.puts "	end"
+		
+				axes = extract_axes(scene, node, instance)
+
+				@output.puts "	axes: array axis"
+				axes.each do |axis|
+					@output.puts "		#{axis.collect{|i| i.to_s.rjust(12)}.join(' ')}"
 				end
 				@output.puts "	end"
 		

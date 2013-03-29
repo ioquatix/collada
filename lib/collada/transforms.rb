@@ -107,5 +107,10 @@ module Collada
 			
 			return product
 		end
+		
+		def self.extract_axis(matrix)
+			# Transform [x, y, z], Rotation [x, y, z, w]
+			[matrix[0, 3], matrix[1, 3], matrix[2, 3], *rotation_matrix_to_quaternion(matrix)]
+		end
 	end
 end
