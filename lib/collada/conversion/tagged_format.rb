@@ -2,6 +2,9 @@
 module Collada
 	module Conversion
 		class TaggedFormat
+			class GeometryError < StandardError
+			end
+
 			TEXCOORD = lambda {|value| [value[:S], -value[:T] + 1.0]}
 
 			VERTEX_FORMATS = {
@@ -32,6 +35,10 @@ module Collada
 				weights = skeleton.indexed_weights if skeleton
 		
 				geometry.mesh.polygons.each do |polygon|
+					if polygon.count != 3
+						raise GeometryError.new("Non-triangular surfaces ")
+					end
+					
 					polygon.each do |vertex_attributes|
 						vertex = Collada::Conversion::Vertex.new(vertex_attributes, vertex_format)
 				
