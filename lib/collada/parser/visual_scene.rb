@@ -67,8 +67,9 @@ module Collada
 			]
 			
 			class Node
-				def initialize(id, name, type, transforms, instances, children, attributes = {})
+				def initialize(id, sid, name, type, transforms, instances, children, attributes = {})
 					@id = id
+					@sid = sid
 					@name = name
 					@type = type
 					
@@ -89,6 +90,8 @@ module Collada
 				attr :parent
 				
 				attr :id
+				attr :sid
+				
 				attr :name
 				attr :type
 				
@@ -160,6 +163,8 @@ module Collada
 				
 				def self.parse(doc, element)
 					id = element.attributes['id']
+					sid = element.attributes['sid']
+					
 					name = element.attributes['name']
 					type = (element.attributes['type'] || 'node').downcase.to_sym
 					
@@ -167,7 +172,7 @@ module Collada
 					instances = parse_instances(doc, element)
 					children = parse_children(doc, element)
 					
-					self.new(id, name, type, transforms, instances, children, element.attributes)
+					self.new(id, sid, name, type, transforms, instances, children, element.attributes)
 				end
 			end
 			

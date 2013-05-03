@@ -66,14 +66,14 @@ module Collada
 			
 			def extract_skeleton(top)
 				@bones = [[0, top]]
-				@indexed = {top.id => 0}
+				@indexed = {top.sid => 0}
 				
 				@scene.traverse(top.children) do |node|
 					next unless node.type == :joint
 					
-					bone_index = indexed[node.parents(:joint).first.id]
+					bone_index = indexed[node.parents(:joint).first.sid]
 					
-					@indexed[node.id] = bones.size
+					@indexed[node.sid] = bones.size
 					@bones << [bone_index, node]
 				end
 				
