@@ -125,7 +125,7 @@ module Collada
 				@output.puts "		default: skeleton-animation #{start_time} #{end_time}"
 				@output.puts "			key-frames: array skeleton-animation-key-frame"
 				skeleton.bones.each do |(parent, bone)|
-					channel = channels["#{bone.id}/transform"]
+					channel = channels["#{bone.id}/transform"] || channels["#{bone.id}/matrix"]
 			
 					next unless channel
 			
